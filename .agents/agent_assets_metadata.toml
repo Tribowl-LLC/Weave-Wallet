@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "btE1yajlphhqDtCuu15qi"
+uri = "file://artifacts/fiberpay/public/icon-512.png"
+type = "image"
+title = "FiberPay abstract bolt mark"
