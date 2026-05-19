@@ -169,7 +169,7 @@ export default function Scan() {
                 />
               </div>
               <p className="text-white font-medium mt-8 text-center px-6">
-                Point at the Square terminal's Lightning QR
+                Point at any Lightning invoice QR
               </p>
             </div>
           </>

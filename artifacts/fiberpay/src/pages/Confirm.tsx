@@ -108,7 +108,7 @@ export default function Confirm() {
     if (!canPay) return;
     
     setStage("authenticating");
-    setStageDetail("Waiting for Face ID...");
+    setStageDetail("Confirming with biometrics...");
     
     try {
       let authSig = "mock_sig";
@@ -154,13 +154,8 @@ export default function Confirm() {
         });
         
         setStage("settled");
-        setStageDetail("Payment complete");
+        setStageDetail("Lightning invoice fulfilled");
         refreshBalances();
-        
-        setTimeout(() => {
-          setPendingInvoice(null);
-          setLocation("/home");
-        }, 2500);
         
       } catch (err: any) {
         updateEntry(activityId, {
@@ -204,9 +199,12 @@ export default function Confirm() {
               <div className="w-24 h-24 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(22,201,83,0.3)]">
                 <CheckCircle2 className="w-12 h-12" />
               </div>
-              <h2 className="text-3xl font-bold mb-2">Paid {formattedUsd}</h2>
-              <p className="text-muted-foreground font-medium mb-1">in {currentAsset}</p>
-              <p className="text-xs text-muted-foreground/60 font-mono">Fiber tx {pendingInvoice.fiber.paymentHash.slice(0, 10)}...</p>
+              <h2 className="text-3xl font-bold mb-2">Payment sent</h2>
+              <p className="text-2xl font-semibold text-foreground mb-1">{formattedUsd} <span className="text-base text-muted-foreground font-medium">in {currentAsset}</span></p>
+              <p className="text-sm text-muted-foreground max-w-[260px] mt-3 mb-4 leading-relaxed">
+                Lightning invoice fulfilled. The merchant should see it as paid shortly.
+              </p>
+              <p className="text-xs text-muted-foreground/60 font-mono">Fiber tx {pendingInvoice.fiber.paymentHash.slice(0, 10)}...{pendingInvoice.fiber.paymentHash.slice(-6)}</p>
             </motion.div>
           ) : stage === "failed" ? (
             <motion.div 
@@ -244,7 +242,7 @@ export default function Confirm() {
               className="w-full"
             >
               <div className="text-center mb-10">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Pay Square Merchant</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Lightning Invoice</p>
                 <div className="text-5xl font-bold tracking-tighter mb-4 text-foreground">
                   {formattedUsd}
                 </div>
@@ -310,6 +308,29 @@ export default function Confirm() {
       </div>
 
       <div className="mt-auto pt-6 w-full max-w-sm mx-auto z-10 space-y-3">
+        {stage === "settled" && (
+          <>
+            <Button
+              onClick={() => {
+                setPendingInvoice(null);
+                setLocation("/activity");
+              }}
+              className="w-full h-14 rounded-2xl text-md bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_8px_30px_rgba(22,201,83,0.25)]"
+            >
+              View in activity
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full h-12 rounded-2xl text-muted-foreground"
+              onClick={() => {
+                setPendingInvoice(null);
+                setLocation("/home");
+              }}
+            >
+              Done
+            </Button>
+          </>
+        )}
         {stage !== "settled" && stage !== "failed" && (
           <>
             <motion.button
@@ -327,14 +348,14 @@ export default function Confirm() {
                 ) : (
                   <>
                     <Fingerprint className="w-6 h-6" />
-                    Pay with Face ID
+                    Pay with {currentAsset}
                   </>
                 )
               ) : (
                 <>
                   <Loader2 className="w-6 h-6 animate-spin" />
                   <div className="flex flex-col items-start text-left">
-                    <span>{stage === "routing" ? "Routing payment..." : stage === "settling" ? "Settling Lightning..." : "Processing..."}</span>
+                    <span>{stage === "creating_invoice" ? "Preparing payment..." : stage === "routing" ? "Routing on Fiber..." : stage === "settling" ? "Fulfilling Lightning invoice..." : stage === "authenticating" ? "Authorizing..." : "Sending payment..."}</span>
                     {stageDetail && <span className="text-xs opacity-80 font-normal">{stageDetail}</span>}
                   </div>
                 </>

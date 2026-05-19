@@ -109,7 +109,7 @@ export class MockFiberClient implements FiberClient {
       throw new FiberError("lightning_failed", "Lightning settlement failed; funds refunded");
     }
 
-    notify("settled", "Payment complete");
+    notify("settled", "Lightning invoice fulfilled");
     return {
       paymentId: "pay_" + crypto.randomUUID(),
       fiberTxHash: randomHex(32),
