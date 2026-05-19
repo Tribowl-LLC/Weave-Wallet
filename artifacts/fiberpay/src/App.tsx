@@ -9,6 +9,7 @@ import Home from "@/pages/Home";
 import Scan from "@/pages/Scan";
 import Confirm from "@/pages/Confirm";
 import Settings from "@/pages/Settings";
+import Activity from "@/pages/Activity";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ function Router() {
         <Route path="/home" component={Home} />
         <Route path="/scan" component={Scan} />
         <Route path="/confirm" component={Confirm} />
+        <Route path="/activity" component={Activity} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

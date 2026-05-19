@@ -5,6 +5,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { X, Keyboard, Loader2 } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { decodeInvoice } from "@/lib/lightning";
+import { getFiberClient } from "@/lib/fiber/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,12 +13,13 @@ import { toast } from "sonner";
 
 export default function Scan() {
   const [, setLocation] = useLocation();
-  const { setPendingInvoice, unlocked } = useWalletStore();
+  const { setPendingInvoice, unlocked, selectedAsset } = useWalletStore();
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manualInvoice, setManualInvoice] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!unlocked) {
@@ -83,13 +85,43 @@ export default function Scan() {
       return;
     }
 
-    setPendingInvoice({
-      paymentRequest: decoded.paymentRequest,
-      amountMsat: decoded.amountMsat,
-      description: decoded.description
-    });
+    setLoadingMsg("Preparing payment...");
     
-    setLocation("/confirm");
+    try {
+      const client = getFiberClient();
+      const fiberInvoice = await client.createInvoiceFromLightning({
+        lightningInvoice: decoded.paymentRequest,
+        amountMsat: decoded.amountMsat,
+        description: decoded.description,
+        asset: selectedAsset,
+      });
+
+      setPendingInvoice({
+        lightning: {
+          paymentRequest: decoded.paymentRequest,
+          amountMsat: decoded.amountMsat,
+          description: decoded.description
+        },
+        fiber: fiberInvoice
+      });
+      
+      setLocation("/confirm");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to prepare payment");
+      setIsProcessing(false);
+      setLoadingMsg(null);
+      if (scannerRef.current && !isManualOpen) {
+        try {
+          await scannerRef.current.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            handleInvoice,
+            undefined
+          );
+        } catch (e) {}
+      }
+    }
   };
 
   const handleManualSubmit = () => {
@@ -119,11 +151,16 @@ export default function Scan() {
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-white/70">
             {error}
           </div>
+        ) : loadingMsg ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white z-30 bg-black/60 backdrop-blur-sm">
+            <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+            <p className="font-medium text-lg">{loadingMsg}</p>
+          </div>
         ) : (
           <>
             <div id="reader" className="absolute inset-0 object-cover w-full h-full" />
             
-            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10">
               <div className="w-[250px] h-[250px] border-2 border-primary/50 rounded-3xl relative overflow-hidden">
                 <motion.div 
                   animate={{ y: ["0%", "100%", "0%"] }}
