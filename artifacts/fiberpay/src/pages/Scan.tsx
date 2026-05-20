@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { haptic } from "@/lib/haptics";
+import { friendlyError } from "@/lib/errors";
 
 export default function Scan() {
   const [, setLocation] = useLocation();
@@ -69,7 +71,10 @@ export default function Scan() {
     const decoded = decodeInvoice(text);
     
     if (decoded.error) {
-      toast.error(decoded.error);
+      haptic.warning();
+      // Route through friendlyError so we don't leak raw bolt11 parser
+      // messages ("checksum mismatch at position 42") to the user.
+      toast.error(friendlyError(new Error(decoded.error)).message);
       setIsProcessing(false);
       // Restart scanner if invalid
       if (scannerRef.current && !isManualOpen) {
@@ -85,6 +90,7 @@ export default function Scan() {
       return;
     }
 
+    haptic.success();
     setLoadingMsg("Preparing payment...");
     
     try {
@@ -110,7 +116,8 @@ export default function Scan() {
       setLocation("/confirm");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Failed to prepare payment");
+      haptic.error();
+      toast.error(friendlyError(err).message);
       setIsProcessing(false);
       setLoadingMsg(null);
       if (scannerRef.current && !isManualOpen) {
@@ -141,8 +148,9 @@ export default function Scan() {
     >
       <div className="absolute top-0 left-0 right-0 p-6 z-20 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         <button 
-          onClick={() => setLocation("/home")}
-          className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white"
+          onClick={() => { haptic.tap(); setLocation("/home"); }}
+          aria-label="Close scanner"
+          className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white focus:outline-none focus:ring-2 focus:ring-primary/60"
         >
           <X className="w-5 h-5" />
         </button>

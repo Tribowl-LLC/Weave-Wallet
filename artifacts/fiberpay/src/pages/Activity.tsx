@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Activity, Copy, Check } from "lucide-react";
+import { ArrowLeft, Activity, Copy, Check, Download } from "lucide-react";
 import { useActivityStore } from "@/store/activity";
 import { getAsset } from "@/lib/fiber/assets";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerTrigger } from "@/components/ui/drawer";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { haptic } from "@/lib/haptics";
+import { exportActivityAsCsv, exportActivityAsJson } from "@/lib/exportActivity";
 
 function CopyButton({ text, label = "Value" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -48,10 +53,47 @@ export default function ActivityPage() {
       className="min-h-screen flex flex-col bg-background"
     >
       <header className="flex items-center p-6 pb-2 sticky top-0 bg-background/80 backdrop-blur-md z-10">
-        <Link href="/home" className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground -ml-2 mr-2">
+        <Link
+          href="/home"
+          aria-label="Back to home"
+          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground -ml-2 mr-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="text-xl font-semibold tracking-tight">Activity</h1>
+        <h1 className="text-xl font-semibold tracking-tight flex-1">Activity</h1>
+        {entries.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Export activity"
+                onClick={() => haptic.tap()}
+                className="w-10 h-10 rounded-full text-muted-foreground hover:text-foreground focus:ring-2 focus:ring-primary/40"
+              >
+                <Download className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-card border-border/60">
+              <DropdownMenuItem
+                onClick={() => {
+                  exportActivityAsCsv(entries);
+                  toast.success(`Exported ${entries.length} ${entries.length === 1 ? "entry" : "entries"} as CSV`);
+                }}
+              >
+                Download CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  exportActivityAsJson(entries);
+                  toast.success(`Exported ${entries.length} ${entries.length === 1 ? "entry" : "entries"} as JSON`);
+                }}
+              >
+                Download JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </header>
 
       <div className="flex-1 p-6 pt-4">

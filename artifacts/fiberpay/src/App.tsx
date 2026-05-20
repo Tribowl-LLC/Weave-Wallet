@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence } from "framer-motion";
 
+import OfflineBanner from "@/components/OfflineBanner";
 import SplashAuth from "@/pages/SplashAuth";
 import Home from "@/pages/Home";
 import Scan from "@/pages/Scan";
@@ -48,6 +49,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
+        <OfflineBanner />
         <Toaster theme="dark" position="top-center" />
       </TooltipProvider>
     </QueryClientProvider>

@@ -7,6 +7,7 @@ import { useActivityStore } from "@/store/activity";
 import { authenticatePasskey } from "@/lib/passkey";
 import { formatUsd } from "@/lib/lightning";
 import { haptic } from "@/lib/haptics";
+import { friendlyError } from "@/lib/errors";
 import { getFiberClient, FiberError, FiberRpcError, reconnectFiber } from "@/lib/fiber/client";
 import { getAsset } from "@/lib/fiber/assets";
 import type { PaymentStage, FiberConnectionState, PaymentResult, LightningStatus } from "@/lib/fiber/types";
@@ -184,19 +185,16 @@ export default function Confirm() {
         refreshBalances();
         
       } catch (err: any) {
+        const friendly = friendlyError(err, { includeRaw: true });
         updateEntry(activityId, {
           status: "failed",
-          errorCode: err instanceof FiberError || err instanceof FiberRpcError ? err.code : "unknown",
-          errorMessage: err.message || "Payment failed",
+          errorCode: friendly.code,
+          errorMessage: friendly.message,
         });
-        
+
         setStage("failed");
         haptic.error();
-        let displayError = err.message || "Payment failed";
-        if (err instanceof FiberRpcError && ["network", "timeout", "unreachable"].includes(err.code)) {
-           displayError = "Cannot reach your Fiber node — is it still running?";
-        }
-        setErrorMsg(displayError);
+        setErrorMsg(friendly.message);
       } finally {
         unsub?.();
       }
@@ -281,13 +279,15 @@ export default function Confirm() {
       } else if (res.status === "pending") {
         toast.info("Still pending — give it another moment");
       } else if (res.status === "unknown") {
-        toast.info(res.error ? `Couldn't verify: ${res.error}` : "Couldn't verify with your node");
+        // Don't surface raw transport errors here — translate them.
+        const detail = res.error ? friendlyError(new Error(res.error)).message : null;
+        toast.info(detail ? `Couldn't verify: ${detail}` : "Couldn't verify with your node");
       } else if (res.status === "failed") {
         haptic.error();
-        toast.error(res.error || "Lightning settlement failed");
+        toast.error(res.error ? friendlyError(new Error(res.error)).message : "Lightning settlement failed");
       }
     } catch (err: any) {
-      toast.error(err?.message || "Re-check failed");
+      toast.error(friendlyError(err).message);
     } finally {
       setIsRetryingLn(false);
     }
@@ -638,6 +638,16 @@ export default function Confirm() {
                     <span>{stage === "creating_invoice" ? "Creating Fiber invoice..." : stage === "routing" ? "Sending payment on Fiber..." : stage === "settling" ? "Fulfilling Lightning invoice..." : stage === "awaiting_lightning" ? "Confirming Lightning settlement..." : stage === "authenticating" ? "Authorizing..." : "Sending payment..."}</span>
                     {stageDetail && <span className="text-xs opacity-80 font-normal">{stageDetail}</span>}
                   </div>
+                  {/* Screen-reader-only live region so assistive tech announces
+                      stage progression without disrupting the visible button. */}
+                  <span role="status" aria-live="polite" className="sr-only">
+                    {stage === "creating_invoice" ? "Creating Fiber invoice" :
+                     stage === "routing" ? "Sending payment on Fiber" :
+                     stage === "settling" ? "Fulfilling Lightning invoice" :
+                     stage === "awaiting_lightning" ? "Confirming Lightning settlement" :
+                     stage === "authenticating" ? "Authorizing" : "Sending payment"}
+                    {stageDetail ? `. ${stageDetail}` : ""}
+                  </span>
                 </>
               )}
             </motion.button>
