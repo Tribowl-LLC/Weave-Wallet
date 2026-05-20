@@ -1,5 +1,7 @@
 # WeaveWallet
 
+**v1.0 — May 2026** · [Release notes](./artifacts/fiberpay/docs/v1.0-release-notes.md) · [Community announcement](./artifacts/fiberpay/docs/nervos-announcement.md)
+
 A non-custodial PWA that scans a Lightning invoice and pays it from your
 **Fiber stablecoin** (RUSD / USDI) balance, settled atomically by your
 own Fiber node.
@@ -58,6 +60,8 @@ fresh VPS to a paid Square Sandbox transaction:
 
 ### Companion docs
 
+- [v1.0 release notes](./artifacts/fiberpay/docs/v1.0-release-notes.md) — what's in v1.0, what's deliberately out, and our call for pilot testers.
+- [Community announcement](./artifacts/fiberpay/docs/nervos-announcement.md) — long / medium / short formats for forums, Discord, and X.
 - [Real-world testing checklist](./artifacts/fiberpay/docs/testing-guide.md) — the broader checklist with eight deliberately-triggered failure cases and a production-readiness gate. Works with any bolt11 source (Phoenix, LND, Strike, Cash App, Square, BTCPay).
 - [Fiber node setup](./artifacts/fiberpay/docs/fiber-node-setup.md) — Docker Compose template, config, and a troubleshooting table for the node alone.
 - [Lightning fulfillment & atomicity](./artifacts/fiberpay/docs/lightning-fulfillment.md) — what the two-leg payment looks like and why atomicity is your node's guarantee, not the wallet's.
@@ -152,6 +156,17 @@ Both must be green. New business logic should land with tests under
 template for what coverage looks like (~70-80% on critical logic,
 deterministic mocks for `Math.random` and external libs, no UI pixel
 matching).
+
+---
+
+## Pilot testers wanted
+
+WeaveWallet v1.0 is production-shaped but pilot-grade. We're
+specifically looking for **Fiber node operators**, **merchants with
+bolt11 POS setups** (Square, BTCPay, etc.), **bridge operators**, and
+**designers / accessibility reviewers**. File issues with the
+`pilot-feedback` label. Full details and how-to-help in the
+[v1.0 release notes](./artifacts/fiberpay/docs/v1.0-release-notes.md#call-for-early-feedback--pilot-testers).
 
 ---
 
