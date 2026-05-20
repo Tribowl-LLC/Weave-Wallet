@@ -360,7 +360,7 @@ export default function Confirm() {
                   : isFailed
                     ? "Lightning settlement failed"
                     : isUnknown
-                      ? "Lightning status unverified"
+                      ? "Fiber payment sent"
                       : "Lightning settlement pending";
                 const subcopy = isSettled
                   ? "Lightning invoice fulfilled."
