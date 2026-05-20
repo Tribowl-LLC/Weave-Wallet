@@ -13,6 +13,7 @@ import Confirm from "@/pages/Confirm";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
 import Onboarding from "@/pages/Onboarding";
+import Help from "@/pages/Help";
 import NotFound from "@/pages/not-found";
 
 import { bootstrapFiberConnection } from "@/lib/fiber/client";
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/confirm" component={Confirm} />
         <Route path="/activity" component={Activity} />
         <Route path="/settings" component={Settings} />
+        <Route path="/help" component={Help} />
         <Route component={NotFound} />
       </Switch>
     </AnimatePresence>

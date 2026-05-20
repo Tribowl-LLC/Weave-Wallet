@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ScanLine, Settings, Activity, ArrowUpRight, ArrowDownLeft, ChevronRight, FlaskConical, Download, X } from "lucide-react";
+import { ScanLine, Settings, Activity, ArrowUpRight, ArrowDownLeft, ChevronRight, FlaskConical, Download, X, ClipboardCheck } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { getFiberClient } from "@/lib/fiber/client";
@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { unlocked, hasOnboarded, balances, setBalances, selectedAsset, setSelectedAsset, installPromptDismissed, setInstallPromptDismissed } = useWalletStore();
+  const { unlocked, hasOnboarded, balances, setBalances, selectedAsset, setSelectedAsset, installPromptDismissed, setInstallPromptDismissed, testReadyBannerDismissed, setTestReadyBannerDismissed } = useWalletStore();
   const { entries } = useActivityStore();
   const [isLoading, setIsLoading] = useState(false);
   const [connState, setConnState] = useState(getFiberConnection());
@@ -125,6 +125,14 @@ export default function Home() {
   const hasUnverifiedLn = entries.slice(0, 5).some(e => e.lightningStatus === "unknown" || e.lightningStatus === "pending");
   const showTestModeBanner = connState.mode === "mock";
   const showInstallBanner = !!installPrompt && !installPromptDismissed;
+  // Surface the "Ready to test" prompt only once the user has done the
+  // hard work (real node, healthy connection) but hasn't dismissed it.
+  // It's the bridge between "I configured everything" and "I should
+  // actually try a payment with my own real money".
+  const showTestReadyBanner =
+    connState.mode === "real" &&
+    connState.status === "connected" &&
+    !testReadyBannerDismissed;
 
   return (
     <motion.div 
@@ -183,6 +191,30 @@ export default function Home() {
             <div className="text-xs text-muted-foreground truncate">A recent payment is pending confirmation. Tap to review.</div>
           </div>
           <ChevronRight className="w-4 h-4 text-amber-400/70 shrink-0" />
+        </div>
+      )}
+
+      {showTestReadyBanner && (
+        <div className="mb-4 flex items-center gap-3 bg-primary/10 border border-primary/30 rounded-2xl p-3">
+          <ClipboardCheck className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-primary">Ready to test with real funds?</div>
+            <div className="text-xs text-muted-foreground truncate">Step-by-step checklist for your first real payment.</div>
+          </div>
+          <Link
+            href="/help"
+            onClick={() => haptic.tap()}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Open
+          </Link>
+          <button
+            onClick={() => { setTestReadyBannerDismissed(true); }}
+            aria-label="Dismiss testing checklist prompt"
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-muted/40 text-muted-foreground transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 

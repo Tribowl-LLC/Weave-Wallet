@@ -24,6 +24,7 @@ interface WalletState {
   unlocked: boolean;
   hasOnboarded: boolean;
   installPromptDismissed: boolean;
+  testReadyBannerDismissed: boolean;
   pendingInvoice: PendingInvoice | null;
   selectedAsset: AssetSymbol;
   balances: { RUSD: string; USDI: string } | null;
@@ -33,6 +34,7 @@ interface WalletState {
   setUnlocked: (unlocked: boolean) => void;
   setHasOnboarded: (v: boolean) => void;
   setInstallPromptDismissed: (v: boolean) => void;
+  setTestReadyBannerDismissed: (v: boolean) => void;
   setPendingInvoice: (invoice: PendingInvoice | null) => void;
   setSelectedAsset: (asset: AssetSymbol) => void;
   setBalances: (balances: { RUSD: string; USDI: string } | null) => void;
@@ -48,6 +50,7 @@ export const useWalletStore = create<WalletState>()(
       unlocked: false,
       hasOnboarded: false,
       installPromptDismissed: false,
+      testReadyBannerDismissed: false,
       pendingInvoice: null,
       selectedAsset: "RUSD",
       balances: null,
@@ -57,6 +60,7 @@ export const useWalletStore = create<WalletState>()(
       setUnlocked: (unlocked) => set({ unlocked }),
       setHasOnboarded: (hasOnboarded) => set({ hasOnboarded }),
       setInstallPromptDismissed: (installPromptDismissed) => set({ installPromptDismissed }),
+      setTestReadyBannerDismissed: (testReadyBannerDismissed) => set({ testReadyBannerDismissed }),
       setPendingInvoice: (pendingInvoice) => set({ pendingInvoice }),
       setSelectedAsset: (selectedAsset) => set({ selectedAsset }),
       setBalances: (balances) => set({ balances }),
@@ -72,6 +76,7 @@ export const useWalletStore = create<WalletState>()(
         fiberConfig: state.fiberConfig,
         hasOnboarded: state.hasOnboarded,
         installPromptDismissed: state.installPromptDismissed,
+        testReadyBannerDismissed: state.testReadyBannerDismissed,
       }),
     }
   )
