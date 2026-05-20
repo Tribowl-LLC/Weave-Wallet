@@ -170,7 +170,11 @@ export default function Confirm() {
         });
         
         setStage("failed");
-        setErrorMsg(err.message || "Payment failed");
+        let displayError = err.message || "Payment failed";
+        if (err instanceof FiberRpcError && ["network", "timeout", "unreachable"].includes(err.code)) {
+           displayError = "Cannot reach your Fiber node — is it still running?";
+        }
+        setErrorMsg(displayError);
       } finally {
         unsub?.();
       }
@@ -373,7 +377,7 @@ export default function Confirm() {
                 className="w-full flex items-center justify-center gap-2 p-3 bg-amber-500/10 text-amber-500 rounded-xl text-sm font-medium hover:bg-amber-500/20 transition-colors"
               >
                 <AlertTriangle className="w-4 h-4" />
-                Fiber node unreachable. Tap to retry.
+                Your Fiber node isn't reachable. Tap to retry.
               </button>
             )}
             <motion.button

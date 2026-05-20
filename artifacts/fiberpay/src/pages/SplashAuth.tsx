@@ -73,7 +73,7 @@ export default function SplashAuth() {
         
         <h1 className="text-3xl font-bold tracking-tight mb-2">FiberPay</h1>
         <p className="text-muted-foreground text-center mb-12">
-          Pay any Lightning invoice with stablecoins seamlessly.
+          Pay any Lightning invoice with Fiber stablecoins — using your own Fiber node.
         </p>
 
         {!biometricsAvailable ? (

@@ -12,8 +12,9 @@ _Replace the heading above with the project's name, and this line with one sente
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ### Fiber Configuration
-- `VITE_FIBER_RPC_URL`: Set to a Fiber node JSON-RPC endpoint to enable real mode. Leave empty to use the simulated mock client.
-- `VITE_FIBER_MODE`: Optional "auto" (default), "real", or "mock". "auto" uses real mode if URL is reachable, else falls back to mock.
+- The app uses a user-node-first architecture where the user configures the Fiber RPC connection within the Settings screen of the app.
+- Configuration (RPC URL, optional Auth Token, and Mode) is persisted via the `useWalletStore`.
+- No environment variables are required to configure the Fiber RPC endpoint.
 
 ## Stack
 
@@ -30,6 +31,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
+- **User-node-first, non-custodial**: The user runs their own Fiber node and the PWA connects to it directly via RPC.
 - **Custodial Signing Model**: The Fiber node holds the funded wallet key. The PWA just submits send-payment requests. The Passkey gates the UI instead of deriving CKB keys from WebAuthn.
 - **Fiber RPC**: Real RPC method names (`node_info`, `list_channels`, `new_invoice`, `send_payment`, `get_payment`) in `real-client.ts` are best-effort against public Fiber docs. They should be verified against the operator's actual node version.
 

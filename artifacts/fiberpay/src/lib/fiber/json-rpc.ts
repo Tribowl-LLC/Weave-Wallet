@@ -2,12 +2,13 @@ export interface JsonRpcOptions {
   url: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  authToken?: string;
 }
 
 let nextId = 1;
 
 export async function jsonRpcCall<T>(opts: JsonRpcOptions, method: string, params?: unknown): Promise<T> {
-  const { url, timeoutMs = 15000, signal } = opts;
+  const { url, timeoutMs = 15000, signal, authToken } = opts;
   const id = nextId++;
   
   const controller = new AbortController();
@@ -24,6 +25,7 @@ export async function jsonRpcCall<T>(opts: JsonRpcOptions, method: string, param
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
       body: JSON.stringify({
         jsonrpc: "2.0",

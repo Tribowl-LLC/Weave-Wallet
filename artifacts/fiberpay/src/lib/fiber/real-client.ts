@@ -8,9 +8,11 @@ import { msatToAssetUnits, msatToUsd } from "./conversion";
 export class RealFiberClient implements FiberClient {
   private handlers = new Set<(stage: PaymentStage, detail?: string) => void>();
   private url: string;
+  private authToken?: string;
 
-  constructor(url: string) {
-    this.url = url;
+  constructor(config: { url: string; authToken?: string }) {
+    this.url = config.url;
+    this.authToken = config.authToken;
   }
 
   onStage(handler: (stage: PaymentStage, detail?: string) => void): () => void {
@@ -23,19 +25,42 @@ export class RealFiberClient implements FiberClient {
   }
 
   async getNodeInfo(): Promise<FiberNodeInfo> {
-    // TODO: verify method name against Fiber RPC docs
-    const result = await jsonRpcCall<any>({ url: this.url }, "node_info");
+    const opts = { url: this.url, authToken: this.authToken };
+    const result = await jsonRpcCall<any>(opts, "node_info");
+    
+    let syncedBlock = null;
+    if (result) {
+      if (result.synced_block !== undefined) syncedBlock = result.synced_block;
+      else if (result.tip_block_number !== undefined) syncedBlock = result.tip_block_number;
+      else if (result.height !== undefined) syncedBlock = result.height;
+      else {
+        try {
+          const tipResult = await jsonRpcCall<any>(opts, "get_tip_block_number");
+          syncedBlock = tipResult;
+        } catch (e) {
+          syncedBlock = null;
+        }
+      }
+    }
+    
+    if (typeof syncedBlock === 'string' && syncedBlock.startsWith('0x')) {
+      syncedBlock = parseInt(syncedBlock, 16);
+    } else if (typeof syncedBlock === 'string') {
+      syncedBlock = parseInt(syncedBlock, 10);
+    }
+
     return {
       nodeId: result?.node_id || "unknown",
       version: result?.version || "unknown",
       network: result?.network || "unknown",
       channelCount: result?.channel_count || 0,
+      syncedBlock: isNaN(syncedBlock as number) ? null : (syncedBlock as number),
     };
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      await jsonRpcCall({ url: this.url, timeoutMs: 5000 }, "node_info");
+      await jsonRpcCall({ url: this.url, authToken: this.authToken, timeoutMs: 5000 }, "node_info");
       return true;
     } catch (err) {
       return false;
@@ -43,8 +68,7 @@ export class RealFiberClient implements FiberClient {
   }
 
   async getBalances(): Promise<FiberBalance[]> {
-    // TODO: verify method name against Fiber RPC docs
-    const channels = await jsonRpcCall<any[]>({ url: this.url }, "list_channels");
+    const channels = await jsonRpcCall<any[]>({ url: this.url, authToken: this.authToken }, "list_channels");
     
     let rusdBalance = 0n;
     let usdiBalance = 0n;
@@ -77,8 +101,7 @@ export class RealFiberClient implements FiberClient {
     const amount = msatToAssetUnits(args.amountMsat, assetInfo);
     const amountUsd = msatToUsd(args.amountMsat);
     
-    // TODO: verify method name against Fiber RPC docs
-    const response = await jsonRpcCall<any>({ url: this.url }, "new_invoice", {
+    const response = await jsonRpcCall<any>({ url: this.url, authToken: this.authToken }, "new_invoice", {
       amount: "0x" + amount.toString(16),
       currency: assetInfo.typeHash,
       description: args.description || "",
@@ -104,8 +127,7 @@ export class RealFiberClient implements FiberClient {
     try {
       this.notify("routing", "Finding route on Fiber network...");
       
-      // TODO: verify method name against Fiber RPC docs
-      const sendRes = await jsonRpcCall<any>({ url: this.url }, "send_payment", {
+      const sendRes = await jsonRpcCall<any>({ url: this.url, authToken: this.authToken }, "send_payment", {
         invoice: args.invoice.invoiceId,
         lightning_invoice: args.invoice.lightningInvoice,
         max_fee_amount: "0x100000",
@@ -116,8 +138,7 @@ export class RealFiberClient implements FiberClient {
       
       const start = Date.now();
       while (Date.now() - start < 30000) {
-        // TODO: verify method name against Fiber RPC docs
-        const getRes = await jsonRpcCall<any>({ url: this.url }, "get_payment", {
+        const getRes = await jsonRpcCall<any>({ url: this.url, authToken: this.authToken }, "get_payment", {
           payment_hash: paymentHash
         });
         

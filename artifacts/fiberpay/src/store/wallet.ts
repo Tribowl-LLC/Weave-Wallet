@@ -11,6 +11,12 @@ export interface PendingInvoice {
   fiber: FiberInvoice;
 }
 
+export interface FiberConfig {
+  rpcUrl: string;
+  authToken: string;
+  mode: "real" | "mock";
+}
+
 interface WalletState {
   credentialId: string | null;
   userHandle: string | null;
@@ -18,12 +24,14 @@ interface WalletState {
   pendingInvoice: PendingInvoice | null;
   selectedAsset: AssetSymbol;
   balances: { RUSD: string; USDI: string } | null;
+  fiberConfig: FiberConfig;
   setCredential: (credentialId: string, userHandle: string) => void;
   clearCredential: () => void;
   setUnlocked: (unlocked: boolean) => void;
   setPendingInvoice: (invoice: PendingInvoice | null) => void;
   setSelectedAsset: (asset: AssetSymbol) => void;
   setBalances: (balances: { RUSD: string; USDI: string } | null) => void;
+  setFiberConfig: (patch: Partial<FiberConfig>) => void;
   reset: () => void;
 }
 
@@ -36,12 +44,14 @@ export const useWalletStore = create<WalletState>()(
       pendingInvoice: null,
       selectedAsset: "RUSD",
       balances: null,
+      fiberConfig: { rpcUrl: "http://localhost:8227", authToken: "", mode: "real" },
       setCredential: (credentialId, userHandle) => set({ credentialId, userHandle }),
       clearCredential: () => set({ credentialId: null, userHandle: null, unlocked: false }),
       setUnlocked: (unlocked) => set({ unlocked }),
       setPendingInvoice: (pendingInvoice) => set({ pendingInvoice }),
       setSelectedAsset: (selectedAsset) => set({ selectedAsset }),
       setBalances: (balances) => set({ balances }),
+      setFiberConfig: (patch) => set((state) => ({ fiberConfig: { ...state.fiberConfig, ...patch } })),
       reset: () => set({ credentialId: null, userHandle: null, unlocked: false, pendingInvoice: null }),
     }),
     {
@@ -50,6 +60,7 @@ export const useWalletStore = create<WalletState>()(
         credentialId: state.credentialId,
         userHandle: state.userHandle,
         selectedAsset: state.selectedAsset,
+        fiberConfig: state.fiberConfig,
       }),
     }
   )

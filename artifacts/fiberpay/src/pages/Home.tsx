@@ -83,6 +83,8 @@ export default function Home() {
   
   const connColor = connState.status === "connected" ? "bg-green-500" : connState.status === "connecting" ? "bg-amber-500" : "bg-red-500";
 
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -101,6 +103,23 @@ export default function Home() {
           <Settings className="w-5 h-5" />
         </Link>
       </header>
+
+      {!bannerDismissed && connState.mode === "real" && connState.status === "error" && (
+        <div 
+          onClick={() => setLocation("/settings")}
+          className="mb-6 bg-card border border-border/50 border-l-4 border-l-red-500/80 rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-card/80 transition-colors relative"
+        >
+          <button 
+            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-muted/50 hover:bg-muted text-muted-foreground transition-colors"
+            onClick={(e) => { e.stopPropagation(); setBannerDismissed(true); }}
+          >
+            <span className="sr-only">Dismiss</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          <h3 className="font-semibold text-foreground text-sm pr-6">Your Fiber node isn't reachable</h3>
+          <p className="text-muted-foreground text-xs mt-1">FiberPay needs a running node to send real payments. Tap to connect.</p>
+        </div>
+      )}
 
       <div className="relative mb-8">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent rounded-3xl blur-xl" />

@@ -49,6 +49,7 @@ export interface FiberNodeInfo {
   version: string;
   network: string;         // "mainnet" | "testnet" | "devnet"
   channelCount: number;
+  syncedBlock: number | null;
 }
 
 export interface FiberConnectionState {
