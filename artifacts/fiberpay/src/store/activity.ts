@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AssetSymbol } from '../lib/fiber/types';
+import type { AssetSymbol, LightningStatus } from '../lib/fiber/types';
 
 export type ActivityStatus = "pending" | "settled" | "failed";
 
@@ -12,6 +12,9 @@ export interface ActivityEntry {
   amountUsd: number;
   description?: string;
   lightningInvoice: string;
+  lightningPaymentHash?: string;
+  lightningStatus?: LightningStatus;
+  lightningError?: string;
   fiberTxHash?: string;
   preimage?: string;
   errorCode?: string;

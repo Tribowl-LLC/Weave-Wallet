@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Fingerprint, Loader2, ArrowLeftRight, XCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Fingerprint, Loader2, ArrowLeftRight, XCircle, AlertTriangle, RotateCw } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { authenticatePasskey } from "@/lib/passkey";
 import { formatUsd } from "@/lib/lightning";
 import { getFiberClient, FiberError, FiberRpcError, reconnectFiber } from "@/lib/fiber/client";
 import { getAsset } from "@/lib/fiber/assets";
-import type { PaymentStage, FiberConnectionState } from "@/lib/fiber/types";
+import type { PaymentStage, FiberConnectionState, PaymentResult, LightningStatus } from "@/lib/fiber/types";
 import { subscribeFiberConnection, getFiberConnection } from "@/lib/fiber/connection";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -21,7 +21,9 @@ export default function Confirm() {
   const [stage, setStage] = useState<PaymentStage>("idle");
   const [stageDetail, setStageDetail] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [settledDetails, setSettledDetails] = useState<{ fiberTxHash: string; preimage: string } | null>(null);
+  const [settledResult, setSettledResult] = useState<PaymentResult | null>(null);
+  const [activityEntryId, setActivityEntryId] = useState<string | null>(null);
+  const [isRetryingLn, setIsRetryingLn] = useState(false);
   
   const [isSwitchingAsset, setIsSwitchingAsset] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
@@ -135,8 +137,10 @@ export default function Confirm() {
         amountUsd: pendingInvoice.fiber.amountUsd,
         description: pendingInvoice.lightning.description || "Lightning Payment",
         lightningInvoice: pendingInvoice.lightning.paymentRequest,
+        lightningPaymentHash: pendingInvoice.lightning.paymentHash,
         createdAt: Date.now(),
       });
+      setActivityEntryId(activityId);
 
       const client = getFiberClient();
       
@@ -151,17 +155,28 @@ export default function Confirm() {
           signedAuthorization: authSig
         });
         
+        // Fiber leg succeeded. Activity status reflects the Fiber side as
+        // "settled" (the user's funds did move); the Lightning leg is
+        // tracked separately via `lightningStatus` so we can surface
+        // partial failures without confusing the success/fail rollup.
         updateEntry(activityId, {
           id: result.paymentId,
           status: "settled",
           fiberTxHash: result.fiberTxHash,
           preimage: result.preimage,
           settledAt: result.settledAt,
+          lightningStatus: result.lightningStatus,
+          lightningError: result.lightningError,
         });
+        setActivityEntryId(result.paymentId);
         
-        setSettledDetails({ fiberTxHash: result.fiberTxHash, preimage: result.preimage });
+        setSettledResult(result);
         setStage("settled");
-        setStageDetail("Lightning invoice fulfilled");
+        setStageDetail(
+          result.lightningStatus === "settled" ? "Lightning invoice fulfilled" :
+          result.lightningStatus === "failed" ? "Lightning settlement failed" :
+          "Lightning settlement pending"
+        );
         refreshBalances();
         
       } catch (err: any) {
@@ -185,6 +200,48 @@ export default function Confirm() {
       console.error(err);
       toast.error("Authentication failed");
       setStage("idle");
+    }
+  };
+
+  const retryLightning = async () => {
+    if (!settledResult || !pendingInvoice || isRetryingLn) return;
+    const client = getFiberClient();
+    if (!client.retryLightningFulfillment) {
+      toast.error("This client doesn't support Lightning status re-checks");
+      return;
+    }
+    setIsRetryingLn(true);
+    try {
+      const res = await client.retryLightningFulfillment({
+        paymentResult: settledResult,
+        lightningInvoice: pendingInvoice.lightning.paymentRequest,
+        lightningPaymentHash: pendingInvoice.lightning.paymentHash,
+      });
+      const updated: PaymentResult = {
+        ...settledResult,
+        lightningStatus: res.status as LightningStatus,
+        lightningError: res.error,
+      };
+      setSettledResult(updated);
+      if (activityEntryId) {
+        updateEntry(activityEntryId, {
+          lightningStatus: res.status as LightningStatus,
+          lightningError: res.error,
+        });
+      }
+      if (res.status === "settled") {
+        toast.success("Lightning invoice confirmed");
+      } else if (res.status === "pending") {
+        toast.info("Still pending — give it another moment");
+      } else if (res.status === "unknown") {
+        toast.info(res.error ? `Couldn't verify: ${res.error}` : "Couldn't verify with your node");
+      } else if (res.status === "failed") {
+        toast.error(res.error || "Lightning settlement failed");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Re-check failed");
+    } finally {
+      setIsRetryingLn(false);
     }
   };
 
@@ -236,35 +293,117 @@ export default function Confirm() {
               transition={{ type: "spring", damping: 15, stiffness: 200 }}
               className="flex flex-col items-center text-center w-full"
             >
-              <div className="w-24 h-24 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(22,201,83,0.3)]">
-                <CheckCircle2 className="w-12 h-12" />
-              </div>
-              <h2 className="text-3xl font-bold mb-2">Payment sent successfully</h2>
-              <p className="text-2xl font-semibold text-foreground mb-1">{formattedUsd} <span className="text-base text-muted-foreground font-medium">in {currentAsset}</span></p>
-              <p className="text-sm text-muted-foreground max-w-[280px] mt-3 mb-6 leading-relaxed">
-                Lightning invoice should be fulfilled shortly.
-              </p>
-              {settledDetails && (
-                <div className="w-full bg-card border border-border/50 rounded-2xl p-4 space-y-3 text-left">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Transaction</div>
-                  <div className="flex justify-between text-xs gap-3">
-                    <span className="text-muted-foreground">Asset</span>
-                    <span className="font-mono text-foreground">{fiberAmountFormatted} {currentAsset}</span>
-                  </div>
-                  <div className="flex justify-between text-xs gap-3">
-                    <span className="text-muted-foreground">USD</span>
-                    <span className="font-mono text-foreground">{formattedUsd}</span>
-                  </div>
-                  <div className="flex justify-between text-xs gap-3">
-                    <span className="text-muted-foreground shrink-0">Fiber tx</span>
-                    <span className="font-mono text-foreground truncate">{settledDetails.fiberTxHash.slice(0, 10)}…{settledDetails.fiberTxHash.slice(-6)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs gap-3">
-                    <span className="text-muted-foreground shrink-0">Preimage</span>
-                    <span className="font-mono text-foreground truncate">{settledDetails.preimage.slice(0, 10)}…{settledDetails.preimage.slice(-6)}</span>
-                  </div>
-                </div>
-              )}
+              {(() => {
+                const lnStatus = settledResult?.lightningStatus ?? "unknown";
+                const isSettled = lnStatus === "settled";
+                const isPending = lnStatus === "pending";
+                const isUnknown = lnStatus === "unknown";
+                const isFailed = lnStatus === "failed";
+                const needsAttention = isPending || isFailed || isUnknown;
+
+                const ringClass = isSettled
+                  ? "bg-primary/20 text-primary shadow-[0_0_50px_rgba(22,201,83,0.3)]"
+                  : isFailed
+                    ? "bg-amber-500/20 text-amber-500 shadow-[0_0_50px_rgba(245,158,11,0.25)]"
+                    : "bg-amber-400/20 text-amber-400 shadow-[0_0_50px_rgba(251,191,36,0.25)]";
+                const Icon = isSettled ? CheckCircle2 : AlertTriangle;
+                const heading = isSettled
+                  ? "Payment sent successfully"
+                  : isFailed
+                    ? "Lightning settlement failed"
+                    : isUnknown
+                      ? "Lightning status unverified"
+                      : "Lightning settlement pending";
+                const subcopy = isSettled
+                  ? "Lightning invoice fulfilled."
+                  : isFailed
+                    ? "Your Fiber payment went through, but the Lightning leg failed. Your node should refund the funds automatically — re-check status if it persists."
+                    : isUnknown
+                      ? "Your Fiber payment went through, but your node didn't respond when we asked about the Lightning leg. The bridge may have completed silently — check your node or re-check below."
+                      : "Your Fiber payment went through. The Lightning side is taking longer than expected to confirm — give it a moment and re-check.";
+
+                return (
+                  <>
+                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 ${ringClass}`}>
+                      <Icon className="w-12 h-12" />
+                    </div>
+                    <h2 className="text-3xl font-bold mb-2">{heading}</h2>
+                    <p className="text-2xl font-semibold text-foreground mb-1">{formattedUsd} <span className="text-base text-muted-foreground font-medium">in {currentAsset}</span></p>
+                    <p className="text-sm text-muted-foreground max-w-[300px] mt-3 mb-6 leading-relaxed">
+                      {subcopy}
+                    </p>
+
+                    {/* Status pills: Fiber + Lightning shown side-by-side so the
+                        user always sees BOTH legs of the cross-network payment. */}
+                    <div className="flex items-center gap-2 mb-5">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary">
+                        <CheckCircle2 className="w-3 h-3" /> Fiber settled
+                      </span>
+                      <ArrowLeftRight className="w-3 h-3 text-muted-foreground opacity-60" />
+                      {isSettled ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary">
+                          <CheckCircle2 className="w-3 h-3" /> Lightning settled
+                        </span>
+                      ) : isFailed ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500">
+                          <XCircle className="w-3 h-3" /> Lightning failed
+                        </span>
+                      ) : isUnknown ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-muted/40 text-muted-foreground">
+                          <AlertTriangle className="w-3 h-3" /> Lightning unverified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/15 text-amber-400">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Lightning pending
+                        </span>
+                      )}
+                    </div>
+
+                    {needsAttention && (
+                      <Button
+                        onClick={retryLightning}
+                        disabled={isRetryingLn}
+                        variant="outline"
+                        className="mb-5 h-10 rounded-xl border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                      >
+                        {isRetryingLn ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Re-checking...</>
+                        ) : (
+                          <><RotateCw className="w-4 h-4 mr-2" /> Re-check Lightning status</>
+                        )}
+                      </Button>
+                    )}
+
+                    {settledResult && (
+                      <div className="w-full bg-card border border-border/50 rounded-2xl p-4 space-y-3 text-left">
+                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Transaction</div>
+                        <div className="flex justify-between text-xs gap-3">
+                          <span className="text-muted-foreground">Asset</span>
+                          <span className="font-mono text-foreground">{fiberAmountFormatted} {currentAsset}</span>
+                        </div>
+                        <div className="flex justify-between text-xs gap-3">
+                          <span className="text-muted-foreground">USD</span>
+                          <span className="font-mono text-foreground">{formattedUsd}</span>
+                        </div>
+                        <div className="flex justify-between text-xs gap-3">
+                          <span className="text-muted-foreground shrink-0">Fiber tx</span>
+                          <span className="font-mono text-foreground truncate">{settledResult.fiberTxHash.slice(0, 10)}…{settledResult.fiberTxHash.slice(-6)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs gap-3">
+                          <span className="text-muted-foreground shrink-0">Preimage</span>
+                          <span className="font-mono text-foreground truncate">{settledResult.preimage.slice(0, 10)}…{settledResult.preimage.slice(-6)}</span>
+                        </div>
+                        {settledResult.lightningError && (
+                          <div className="flex justify-between text-xs gap-3 pt-1 border-t border-border/30">
+                            <span className="text-muted-foreground shrink-0">LN error</span>
+                            <span className="text-amber-400 text-right max-w-[180px]">{settledResult.lightningError}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </motion.div>
           ) : stage === "failed" ? (
             <motion.div 
@@ -424,7 +563,7 @@ export default function Confirm() {
                 <>
                   <Loader2 className="w-6 h-6 animate-spin" />
                   <div className="flex flex-col items-start text-left">
-                    <span>{stage === "creating_invoice" ? "Creating Fiber invoice..." : stage === "routing" ? "Sending payment on Fiber..." : stage === "settling" ? "Fulfilling Lightning invoice..." : stage === "authenticating" ? "Authorizing..." : "Sending payment..."}</span>
+                    <span>{stage === "creating_invoice" ? "Creating Fiber invoice..." : stage === "routing" ? "Sending payment on Fiber..." : stage === "settling" ? "Fulfilling Lightning invoice..." : stage === "awaiting_lightning" ? "Confirming Lightning settlement..." : stage === "authenticating" ? "Authorizing..." : "Sending payment..."}</span>
                     {stageDetail && <span className="text-xs opacity-80 font-normal">{stageDetail}</span>}
                   </div>
                 </>

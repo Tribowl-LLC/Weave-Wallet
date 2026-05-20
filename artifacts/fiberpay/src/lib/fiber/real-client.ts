@@ -181,11 +181,26 @@ export class RealFiberClient implements FiberClient {
         } else if (status === "Settling" || status === "SettlingLightning") {
           this.notify("settling", "Fulfilling Lightning invoice...");
         } else if (status === "Succeeded") {
+          const preimage = getRes.preimage || "0x0";
+          const finalPaymentId = getRes.payment_id || paymentId || "pay_" + crypto.randomUUID();
+          const finalFiberTx = paymentHash || getRes.payment_hash || pollKey;
+
+          // Fiber side is settled. Now verify the Lightning leg actually
+          // fulfilled on the OTHER network. This is best-effort: most node
+          // builds don't expose a single canonical RPC for "did the
+          // bridged Lightning invoice settle", so we try a couple of
+          // plausible methods. Either way the answer is informational —
+          // the wallet caller decides how to surface partial-failure.
+          this.notify("awaiting_lightning", "Confirming Lightning settlement...");
+          const ln = await this.awaitLightningFulfillment(args.invoice.lightningInvoice, preimage);
+
           return {
-            paymentId: getRes.payment_id || paymentId || "pay_" + crypto.randomUUID(),
-            fiberTxHash: paymentHash || getRes.payment_hash || pollKey,
-            preimage: getRes.preimage || "0x0",
+            paymentId: finalPaymentId,
+            fiberTxHash: finalFiberTx,
+            preimage,
             settledAt: Date.now(),
+            lightningStatus: ln.status,
+            lightningError: ln.error,
           };
         } else if (status === "Failed") {
           throw new FiberRpcError(getRes.error_code || "payment_failed", getRes.error_message || "Payment failed on Fiber");
@@ -199,5 +214,120 @@ export class RealFiberClient implements FiberClient {
       if (err instanceof FiberRpcError) throw err;
       throw new FiberRpcError("unknown", err.message);
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Lightning fulfillment verification
+  //
+  // After the Fiber leg settles we need to know whether the original
+  // Lightning invoice was actually paid. In the HTLC-equivalence model
+  // this happens automatically (the preimage that unlocked Fiber also
+  // unlocks the Lightning HTLC). In a submarine-swap model the node
+  // bridges asynchronously and we may briefly observe a "pending"
+  // state. Either way the AUTHORITATIVE answer lives on the node, not
+  // in the PWA — we just poll.
+  //
+  // TODO: replace with whichever RPC the operator's fnn build actually
+  // exposes (`get_lightning_invoice`, `wait_invoice`, `lookup_invoice`,
+  // gRPC subscriptions, etc.). The current implementation tries two
+  // plausible method names and falls back to "unknown" so the wallet
+  // can still surface a useful UX rather than crashing.
+  // ─────────────────────────────────────────────────────────────────────
+  private async awaitLightningFulfillment(
+    lightningInvoice: string,
+    preimage: string,
+    timeoutMs = 12000
+  ): Promise<{ status: "settled" | "pending" | "failed" | "unknown"; error?: string }> {
+    const start = Date.now();
+    let triedMethods = false;
+    let lastTransportError: string | undefined;
+
+    // jsonRpcCall normalizes JSON-RPC error codes to STRINGS (see json-rpc.ts:
+    // `code?.toString()`), so we compare against the string form. We also
+    // match the textual "method_not_found" alias that some node builds emit.
+    const isCapabilityError = (err: any): boolean => {
+      const code = String(err?.code ?? "");
+      if (code === "-32601" || code === "method_not_found") return true;
+      // Some builds wrap method-missing as a generic message; only fall back
+      // to the textual heuristic when the code is generic.
+      if (code === "rpc_error" || code === "network") {
+        return /method (not found|missing|unknown)|unknown method|no such method/i.test(String(err?.message));
+      }
+      return false;
+    };
+
+    while (Date.now() - start < timeoutMs) {
+      let m1Capability = false;
+      let m2Capability = false;
+
+      try {
+        const res = await jsonRpcCall<any>(
+          { url: this.url, authToken: this.authToken },
+          "get_lightning_invoice",
+          { invoice: lightningInvoice }
+        );
+        triedMethods = true;
+        const s = String(res?.status || res?.state || "").toLowerCase();
+        if (s === "settled" || s === "paid" || s === "succeeded") return { status: "settled" };
+        if (s === "failed" || s === "canceled" || s === "cancelled") {
+          return { status: "failed", error: res?.error_message || "Lightning invoice failed" };
+        }
+        // anything else (open/pending/accepted) → keep polling
+      } catch (err: any) {
+        if (isCapabilityError(err)) {
+          m1Capability = true;
+        } else {
+          // Real transport / RPC error. Remember it and try the fallback;
+          // if BOTH methods fail with transport errors in this iteration
+          // we'll bail with unknown rather than spin pointlessly.
+          lastTransportError = err?.message || lastTransportError;
+        }
+      }
+
+      // Fallback method name some builds use
+      try {
+        const res2 = await jsonRpcCall<any>(
+          { url: this.url, authToken: this.authToken },
+          "lookup_invoice",
+          { payment_request: lightningInvoice }
+        );
+        triedMethods = true;
+        const s = String(res2?.status || res2?.state || "").toLowerCase();
+        if (s === "settled" || s === "paid" || s === "succeeded") return { status: "settled" };
+        if (s === "failed" || s === "canceled" || s === "cancelled") {
+          return { status: "failed", error: res2?.error_message || "Lightning invoice failed" };
+        }
+      } catch (err: any) {
+        if (isCapabilityError(err)) {
+          m2Capability = true;
+        } else {
+          lastTransportError = err?.message || lastTransportError;
+        }
+      }
+
+      // If BOTH attempts in this round were real transport errors (neither
+      // a capability miss nor a successful call), we can't verify — bail
+      // honestly with unknown instead of looping until timeout.
+      if (!m1Capability && !m2Capability && lastTransportError && !triedMethods) {
+        return { status: "unknown", error: lastTransportError };
+      }
+
+      await new Promise(r => setTimeout(r, 750));
+    }
+
+    // Timed out. If no method ever responded successfully, we genuinely
+    // cannot tell. Even if Fiber returned a non-zero preimage, atomicity
+    // is a NODE guarantee we have not independently confirmed — report
+    // unknown rather than implying confirmation we didn't get.
+    if (!triedMethods) return { status: "unknown", error: lastTransportError };
+    return { status: "pending" };
+  }
+
+  async retryLightningFulfillment(args: {
+    paymentResult: PaymentResult;
+    lightningInvoice: string;
+    lightningPaymentHash?: string;
+  }): Promise<{ status: "settled" | "pending" | "failed" | "unknown"; error?: string }> {
+    return this.awaitLightningFulfillment(args.lightningInvoice, args.paymentResult.preimage, 8000);
   }
 }

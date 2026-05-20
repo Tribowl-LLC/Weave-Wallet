@@ -1,4 +1,4 @@
-import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberNodeInfo, FiberConnectionState } from "./types";
+import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberNodeInfo, FiberConnectionState, LightningStatus } from "./types";
 import { MockFiberClient } from "./mock-client";
 import { RealFiberClient } from "./real-client";
 import { getFiberConnection, setFiberConnection } from "./connection";
@@ -21,6 +21,14 @@ export interface FiberClient {
     invoice: FiberInvoice;
     signedAuthorization: string;
   }): Promise<PaymentResult>;
+  // Re-poll the original Lightning invoice's settlement status when an
+  // earlier call left it in "pending". Optional because not every client
+  // implementation can introspect Lightning state.
+  retryLightningFulfillment?(args: {
+    paymentResult: PaymentResult;
+    lightningInvoice: string;
+    lightningPaymentHash?: string;
+  }): Promise<{ status: LightningStatus; error?: string }>;
   onStage?(handler: (stage: PaymentStage, detail?: string) => void): () => void;
   getNodeInfo?(): Promise<FiberNodeInfo>;
   healthCheck?(): Promise<boolean>;

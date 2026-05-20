@@ -65,10 +65,16 @@ export default function ActivityPage() {
                       }`} />
                       <div>
                         <div className="font-medium text-sm text-foreground">{entry.description || "Lightning Payment"}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
                           {new Date(entry.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           {entry.status === 'failed' && <span className="text-red-400 font-medium">Failed</span>}
                           {entry.status === 'pending' && <span className="text-amber-400 font-medium">Pending</span>}
+                          {entry.status === 'settled' && entry.lightningStatus === 'pending' && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-400/15 text-amber-400 font-medium">LN pending</span>
+                          )}
+                          {entry.status === 'settled' && entry.lightningStatus === 'failed' && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500 font-medium">LN failed</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -136,6 +142,21 @@ export default function ActivityPage() {
                         <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
                           <span className="text-muted-foreground">Error</span>
                           <span className="text-red-400 text-right max-w-[200px]">{entry.errorMessage}</span>
+                        </div>
+                      )}
+                      {entry.status === 'settled' && entry.lightningStatus && entry.lightningStatus !== 'settled' && (
+                        <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
+                          <span className="text-muted-foreground">Lightning</span>
+                          <span className={`text-right max-w-[200px] font-medium ${
+                            entry.lightningStatus === 'failed' ? 'text-amber-500' :
+                            entry.lightningStatus === 'unknown' ? 'text-muted-foreground' :
+                            'text-amber-400'
+                          }`}>
+                            {entry.lightningStatus === 'pending' ? 'Pending confirmation' :
+                             entry.lightningStatus === 'failed' ? (entry.lightningError || 'Failed') :
+                             entry.lightningStatus === 'unknown' ? (entry.lightningError ? `Unverified: ${entry.lightningError}` : 'Unverified') :
+                             'Unknown'}
+                          </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">

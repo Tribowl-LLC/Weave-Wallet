@@ -100,7 +100,8 @@ export default function Scan() {
         lightning: {
           paymentRequest: decoded.paymentRequest,
           amountMsat: decoded.amountMsat,
-          description: decoded.description
+          description: decoded.description,
+          paymentHash: decoded.paymentHash
         },
         fiber: fiberInvoice
       });

@@ -4,6 +4,7 @@ export interface DecodedInvoice {
   paymentRequest: string;
   amountMsat: number;
   description?: string;
+  paymentHash?: string;
   error?: string;
 }
 
@@ -43,10 +44,17 @@ export function decodeInvoice(paymentRequest: string): DecodedInvoice {
       description = descTag.data as string;
     }
 
+    let paymentHash: string | undefined;
+    const phTag = decoded.tags.find((t: any) => t.tagName === 'payment_hash');
+    if (phTag && phTag.data) {
+      paymentHash = String(phTag.data);
+    }
+
     return {
       paymentRequest: cleanRequest,
       amountMsat,
-      description
+      description,
+      paymentHash
     };
   } catch (error: any) {
     return {

@@ -109,13 +109,49 @@ export class MockFiberClient implements FiberClient {
       throw new FiberError("lightning_failed", "Lightning settlement failed; funds refunded");
     }
 
-    notify("settled", "Lightning invoice fulfilled");
+    notify("awaiting_lightning", "Confirming Lightning settlement...");
+    await new Promise(r => setTimeout(r, 600));
+
+    // Simulate realistic Lightning fulfillment outcomes. Fiber side has
+    // already settled at this point; only the Lightning leg is in question.
+    //  - 85% settled       (happy path: HTLC equivalence revealed preimage)
+    //  - 10% pending       (bridge still confirming; retry will resolve)
+    //   - 5% failed        (route dropped on LN side; refund expected)
+    const r = Math.random();
+    let lightningStatus: "settled" | "pending" | "failed";
+    let lightningError: string | undefined;
+    if (r < 0.85) {
+      lightningStatus = "settled";
+    } else if (r < 0.95) {
+      lightningStatus = "pending";
+    } else {
+      lightningStatus = "failed";
+      lightningError = "No route on Lightning side; node will refund the Fiber leg";
+    }
+
+    notify("settled", "Payment complete");
     return {
       paymentId: "pay_" + crypto.randomUUID(),
       fiberTxHash: randomHex(32),
       preimage: randomHex(32),
       settledAt: Date.now(),
+      lightningStatus,
+      lightningError,
     };
+  }
+
+  async retryLightningFulfillment(_args: {
+    paymentResult: PaymentResult;
+    lightningInvoice: string;
+    lightningPaymentHash?: string;
+  }): Promise<{ status: "settled" | "pending" | "failed" | "unknown"; error?: string }> {
+    // Mock retry: 70% chance the pending payment settled by now, otherwise
+    // still pending. Failed payments stay failed (refund already issued).
+    await new Promise(r => setTimeout(r, 800));
+    if (_args.paymentResult.lightningStatus === "failed") {
+      return { status: "failed", error: _args.paymentResult.lightningError };
+    }
+    return Math.random() < 0.7 ? { status: "settled" } : { status: "pending" };
   }
 
   onStage(handler: (stage: PaymentStage, detail?: string) => void): () => void {

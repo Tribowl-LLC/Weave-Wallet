@@ -31,14 +31,24 @@ export type PaymentStage =
   | "creating_invoice"
   | "routing"
   | "settling"
+  | "awaiting_lightning"
   | "settled"
   | "failed";
+
+// Status of the original Lightning invoice on the OTHER side of the bridge.
+// - settled: the Lightning invoice was provably fulfilled (preimage confirmed)
+// - pending: Fiber side ok, Lightning side not yet confirmed within our wait window
+// - failed:  node reported the Lightning leg failed (refund expected)
+// - unknown: node didn't expose enough info to determine (best-effort guess)
+export type LightningStatus = "settled" | "pending" | "failed" | "unknown";
 
 export interface PaymentResult {
   paymentId: string;
   fiberTxHash: string;
   preimage: string;
   settledAt: number;
+  lightningStatus: LightningStatus;
+  lightningError?: string;
 }
 
 export type FiberConnectionStatus = "disconnected" | "connecting" | "connected" | "error";

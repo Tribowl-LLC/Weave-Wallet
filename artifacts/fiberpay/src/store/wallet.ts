@@ -7,6 +7,7 @@ export interface PendingInvoice {
     paymentRequest: string;
     amountMsat: number;
     description?: string;
+    paymentHash?: string;
   };
   fiber: FiberInvoice;
 }
