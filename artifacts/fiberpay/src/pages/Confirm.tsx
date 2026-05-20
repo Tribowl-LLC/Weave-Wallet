@@ -210,7 +210,7 @@ export default function Confirm() {
     if (!settledResult || !pendingInvoice) return;
     haptic.tap();
     const text = [
-      `FiberPay receipt`,
+      `WeaveWallet receipt`,
       `${fiberAmountFormatted} ${currentAsset} (${formattedUsd})`,
       pendingInvoice.lightning.description ? `Memo: ${pendingInvoice.lightning.description}` : "",
       `Fiber tx: ${settledResult.fiberTxHash}`,
@@ -223,7 +223,7 @@ export default function Confirm() {
     // clipboard so this works on every browser.
     try {
       if (typeof navigator !== "undefined" && (navigator as any).share) {
-        await (navigator as any).share({ title: "FiberPay receipt", text });
+        await (navigator as any).share({ title: "WeaveWallet receipt", text });
         return;
       }
     } catch {

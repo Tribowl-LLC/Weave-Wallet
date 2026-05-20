@@ -253,7 +253,7 @@ export default function Settings() {
                     </div>
                   )}
                   {!testResult.ok && (
-                    <div className="opacity-90 mt-2 font-medium">Hint: Run <code className="bg-background/50 px-1 py-0.5 rounded">make dual-up</code> in the FiberPay node repo to start your local node.</div>
+                    <div className="opacity-90 mt-2 font-medium">Hint: Run <code className="bg-background/50 px-1 py-0.5 rounded">make dual-up</code> in your Fiber node repo to start your local node.</div>
                   )}
                 </div>
               </div>
@@ -388,7 +388,7 @@ export default function Settings() {
         )}
 
         <div className="text-center text-xs text-muted-foreground pt-4 pb-4 flex flex-col gap-1">
-          <p>FiberPay Wallet v1.0.0</p>
+          <p>WeaveWallet v1.0.0</p>
           <p>Client Side Only</p>
         </div>
       </div>

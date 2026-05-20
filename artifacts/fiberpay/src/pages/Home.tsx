@@ -41,7 +41,7 @@ export default function Home() {
       installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
       if (outcome === 'accepted') {
-        toast.success("FiberPay installed");
+        toast.success("WeaveWallet installed");
       }
     } catch {
       // user dismissed or browser blocked
@@ -133,14 +133,23 @@ export default function Home() {
       exit={{ opacity: 0, x: -20 }}
       className="min-h-screen flex flex-col p-6 bg-background"
     >
-      <header className="flex justify-between items-center mb-8 mt-4">
-        <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-          Wallet
-          <Link href="/settings">
-            <div className={`w-2 h-2 rounded-full ${connColor} shadow-sm opacity-80 cursor-pointer hover:opacity-100 transition-opacity`} />
-          </Link>
-        </h1>
-        <Link href="/settings" className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors">
+      <header className="flex justify-between items-start mb-8 mt-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+            WeaveWallet
+            <Link href="/settings" aria-label="Open settings">
+              <div className={`w-2 h-2 rounded-full ${connColor} shadow-sm opacity-80 cursor-pointer hover:opacity-100 transition-opacity`} />
+            </Link>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5 tracking-wide">
+            Scan Lightning · Pay with Stablecoin
+          </p>
+        </div>
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors shrink-0"
+        >
           <Settings className="w-5 h-5" />
         </Link>
       </header>
@@ -181,7 +190,7 @@ export default function Home() {
         <div className="mb-4 flex items-center gap-3 bg-primary/10 border border-primary/30 rounded-2xl p-3">
           <Download className="w-4 h-4 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-primary">Install FiberPay</div>
+            <div className="text-xs font-semibold text-primary">Install WeaveWallet</div>
             <div className="text-xs text-muted-foreground truncate">Add to your home screen for one-tap access.</div>
           </div>
           <button
@@ -213,7 +222,7 @@ export default function Home() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
           <h3 className="font-semibold text-foreground text-sm pr-6">Your Fiber node isn't reachable</h3>
-          <p className="text-muted-foreground text-xs mt-1">FiberPay needs a running node to send real payments. Tap to connect.</p>
+          <p className="text-muted-foreground text-xs mt-1">WeaveWallet needs a running node to send real payments. Tap to connect.</p>
         </div>
       )}
 

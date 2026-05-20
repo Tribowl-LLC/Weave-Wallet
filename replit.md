@@ -1,6 +1,6 @@
-# [Project name]
+# WeaveWallet
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A non-custodial PWA that lets you scan a Lightning invoice and pay it from your Fiber stablecoin (RUSD / USDI) balance, settled by your own Fiber node.
 
 ## Run & Operate
 

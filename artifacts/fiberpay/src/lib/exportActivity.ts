@@ -32,7 +32,7 @@ export function exportActivityAsJson(entries: ActivityEntry[]): void {
     entries,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  downloadBlob(blob, `fiberpay-activity-${timestamp()}.json`);
+  downloadBlob(blob, `weavewallet-activity-${timestamp()}.json`);
 }
 
 const CSV_HEADERS = [
@@ -75,5 +75,5 @@ export function exportActivityAsCsv(entries: ActivityEntry[]): void {
   // BOM so Excel detects UTF-8 correctly for memos that contain emoji
   // or non-ASCII text.
   const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
-  downloadBlob(blob, `fiberpay-activity-${timestamp()}.csv`);
+  downloadBlob(blob, `weavewallet-activity-${timestamp()}.csv`);
 }

@@ -1,7 +1,7 @@
 {
-  "name": "FiberPay Wallet",
-  "short_name": "FiberPay",
-  "description": "Pay any Lightning invoice with Fiber stablecoins from your own node.",
+  "name": "WeaveWallet",
+  "short_name": "WeaveWallet",
+  "description": "Scan Lightning · Pay with Stablecoin. Non-custodial wallet powered by your own Fiber node.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

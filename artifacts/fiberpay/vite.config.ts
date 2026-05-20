@@ -41,9 +41,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "FiberPay Wallet",
-        short_name: "FiberPay",
-        description: "Pay any Lightning invoice with stablecoins",
+        name: "WeaveWallet",
+        short_name: "WeaveWallet",
+        description: "Scan Lightning · Pay with Stablecoin",
         theme_color: "#16c953",
         background_color: "#0a0a0a",
         display: "standalone",

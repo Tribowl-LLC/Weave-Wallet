@@ -1,6 +1,6 @@
 # Lightning Fulfillment & Atomicity
 
-FiberPay pays a **Lightning** invoice from a **Fiber** stablecoin balance.
+WeaveWallet pays a **Lightning** invoice from a **Fiber** stablecoin balance.
 That requires two settlements: one on Fiber, one on Lightning. The PWA
 itself can't guarantee atomicity — that guarantee lives on **your Fiber
 node**.
@@ -35,7 +35,7 @@ True atomicity requires **one of**:
 3. **Trusted bridge** — the node operator is trusted; partial failures
    are reconciled manually. Not recommended.
 
-FiberPay assumes (1) or (2). The node is responsible for the refund
+WeaveWallet assumes (1) or (2). The node is responsible for the refund
 path; the wallet just surfaces whatever status the node reports.
 
 ## RPCs the wallet expects

@@ -24,13 +24,13 @@ export async function registerPasskey(userHandle: string): Promise<string> {
   
   const options = {
     rp: {
-      name: "FiberPay",
+      name: "WeaveWallet",
       id: hostname,
     },
     user: {
       id: userHandle,
-      name: "fiberpay-user",
-      displayName: "FiberPay User",
+      name: "weavewallet-user",
+      displayName: "WeaveWallet User",
     },
     challenge: generateChallenge(),
     pubKeyCredParams: [

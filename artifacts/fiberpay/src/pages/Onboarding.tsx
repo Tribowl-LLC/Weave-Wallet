@@ -168,7 +168,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         <div className="w-20 h-20 rounded-3xl bg-primary/15 text-primary flex items-center justify-center mb-6 border border-primary/20">
           <Zap className="w-10 h-10" />
         </div>
-        <h2 className="text-3xl font-bold tracking-tight mb-3">Welcome to FiberPay</h2>
+        <h2 className="text-3xl font-bold tracking-tight mb-3">Welcome to WeaveWallet</h2>
         <p className="text-muted-foreground leading-relaxed mb-8">
           Pay any Lightning invoice with Fiber stablecoins (RUSD or USDI), straight from a node you control.
         </p>
@@ -719,7 +719,7 @@ function ChannelStep({ mode, onFinish }: { mode: "mock" | "real"; onFinish: () =
             <span className="font-medium">$50–$200</span>
           </div>
           <p className="text-xs text-muted-foreground pt-2 border-t border-border/40">
-            FiberPay doesn't open channels for you — it's safer to do it from your node's CLI so you can review the peer and fee parameters. The wallet will detect the channel once it's live.
+            WeaveWallet doesn't open channels for you — it's safer to do it from your node's CLI so you can review the peer and fee parameters. The wallet will detect the channel once it's live.
           </p>
         </div>
 
