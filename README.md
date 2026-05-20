@@ -37,25 +37,29 @@ real Fiber node. **Don't skip the next section.**
 
 ---
 
-## Ready to test with real funds?
+## Real-world testing
 
 The wallet is only useful when pointed at a real Fiber node paying real
-Lightning invoices. We've written a step-by-step checklist for that:
+Lightning invoices. We've written step-by-step guides for getting there.
 
-### → [Real-world testing guide](./artifacts/fiberpay/docs/testing-guide.md)
+### → [Deploy WeaveWallet + Run Your First Real Lightning Payment on Square](./artifacts/fiberpay/docs/deployment-and-testing.md)
 
-It covers:
+**Start here for a full end-to-end deployment.** Copy-paste commands from a
+fresh VPS to a paid Square Sandbox transaction:
 
-1. Running your Fiber node (Docker Compose)
-2. Funding it and opening channels
-3. Connecting the wallet
-4. Scanning a real Lightning QR and completing a payment (Phoenix, LND, Strike, Cash App, **Square terminal**, any bolt11 source)
-5. Verifying both legs (Fiber + Lightning) independently
-6. Deliberately triggering every failure case so you know what they look like
+1. Prerequisites (VPS, domain, Square Sandbox, Fiber testnet wallet)
+2. Deploy the wallet on a VPS (Docker Compose + Caddy TLS + Makefile)
+3. Run your own Fiber node, fund it, open channels
+4. Connect the wallet to your node
+5. Fund the node with test stablecoin (RUSD / USDI)
+6. End-to-end test against a real Square Lightning QR
+7. Troubleshooting table keyed to every error message the wallet shows
+8. Success criteria for a valid test
 
-Companion docs:
+### Companion docs
 
-- [Fiber node setup](./artifacts/fiberpay/docs/fiber-node-setup.md) — Docker Compose template, config, and a troubleshooting table keyed to every error message the wallet shows.
+- [Real-world testing checklist](./artifacts/fiberpay/docs/testing-guide.md) — the broader checklist with eight deliberately-triggered failure cases and a production-readiness gate. Works with any bolt11 source (Phoenix, LND, Strike, Cash App, Square, BTCPay).
+- [Fiber node setup](./artifacts/fiberpay/docs/fiber-node-setup.md) — Docker Compose template, config, and a troubleshooting table for the node alone.
 - [Lightning fulfillment & atomicity](./artifacts/fiberpay/docs/lightning-fulfillment.md) — what the two-leg payment looks like and why atomicity is your node's guarantee, not the wallet's.
 
 Inside the app, tap the **"Ready to test with real funds?"** banner on
