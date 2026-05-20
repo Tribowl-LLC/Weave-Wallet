@@ -23,6 +23,10 @@ export interface FiberInvoice {
   paymentHash: string;
   description?: string;
   lightningInvoice: string;
+  // Original Lightning invoice's payment_hash (decoded from bolt11).
+  // Threaded into sendPayment so the node can look up the bridged invoice
+  // by hash, and used by awaitLightningFulfillment as a third probe shape.
+  lightningPaymentHash?: string;
 }
 
 export type PaymentStage =

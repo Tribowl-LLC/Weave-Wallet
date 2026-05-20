@@ -51,6 +51,7 @@ export class MockFiberClient implements FiberClient {
     amountMsat: number;
     description?: string;
     asset: AssetSymbol;
+    lightningPaymentHash?: string;
   }): Promise<FiberInvoice> {
     await new Promise(r => setTimeout(r, 250));
     
@@ -67,6 +68,7 @@ export class MockFiberClient implements FiberClient {
       paymentHash: randomHex(32),
       description: args.description,
       lightningInvoice: args.lightningInvoice,
+      lightningPaymentHash: args.lightningPaymentHash,
     };
   }
 

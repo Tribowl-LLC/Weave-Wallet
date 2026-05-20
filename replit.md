@@ -34,6 +34,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 - **User-node-first, non-custodial**: The user runs their own Fiber node and the PWA connects to it directly via RPC.
 - **Custodial Signing Model**: The Fiber node holds the funded wallet key. The PWA just submits send-payment requests. The Passkey gates the UI instead of deriving CKB keys from WebAuthn.
 - **Fiber RPC**: Real RPC method names (`node_info`, `list_channels`, `new_invoice`, `send_payment`, `get_payment`) in `real-client.ts` are best-effort against public Fiber docs. They should be verified against the operator's actual node version.
+- **Cross-network atomicity is a NODE guarantee, not a wallet guarantee.** After Fiber settles, the wallet polls the node for Lightning status via `get_lightning_invoice` / `lookup_invoice` (by `payment_request` or `payment_hash`) and surfaces `settled` / `pending` / `failed` / `unknown` honestly — it never claims success it didn't verify. Refund of a partial failure is the node's responsibility. See `artifacts/fiberpay/docs/lightning-fulfillment.md`.
 
 ## Product
 

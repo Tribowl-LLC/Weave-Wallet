@@ -196,6 +196,7 @@ export class RealFiberClient implements FiberClient {
     amountMsat: number;
     description?: string;
     asset: AssetSymbol;
+    lightningPaymentHash?: string;
   }): Promise<FiberInvoice> {
     // Pure local quote — no RPC call.
     // The wallet is PAYING a Lightning invoice, not creating an incoming one,
@@ -216,6 +217,7 @@ export class RealFiberClient implements FiberClient {
       paymentHash: "",  // unknown locally; populated from send_payment response
       description: args.description,
       lightningInvoice: args.lightningInvoice,
+      lightningPaymentHash: args.lightningPaymentHash,
     };
   }
 
@@ -292,7 +294,12 @@ export class RealFiberClient implements FiberClient {
           // plausible methods. Either way the answer is informational —
           // the wallet caller decides how to surface partial-failure.
           this.notify("awaiting_lightning", "Confirming Lightning settlement...");
-          const ln = await this.awaitLightningFulfillment(args.invoice.lightningInvoice, preimage);
+          const ln = await this.awaitLightningFulfillment(
+            args.invoice.lightningInvoice,
+            preimage,
+            12000,
+            args.invoice.lightningPaymentHash,
+          );
 
           return {
             paymentId: finalPaymentId,
@@ -336,7 +343,8 @@ export class RealFiberClient implements FiberClient {
   private async awaitLightningFulfillment(
     lightningInvoice: string,
     preimage: string,
-    timeoutMs = 12000
+    timeoutMs = 12000,
+    paymentHash?: string,
   ): Promise<{ status: "settled" | "pending" | "failed" | "unknown"; error?: string }> {
     const start = Date.now();
     let triedMethods = false;
@@ -405,10 +413,42 @@ export class RealFiberClient implements FiberClient {
         }
       }
 
-      // If BOTH attempts in this round were real transport errors (neither
-      // a capability miss nor a successful call), we can't verify — bail
-      // honestly with unknown instead of looping until timeout.
-      if (!m1Capability && !m2Capability && lastTransportError && !triedMethods) {
+      // Third probe: some node builds key invoices by payment_hash rather
+      // than the full bolt11 string. We only attempt this if we have a
+      // hash and the previous two methods didn't already settle the
+      // question. This is the most "lightning-native" lookup shape.
+      let m3Tried = false;
+      let m3Capability = false;
+      if (paymentHash) {
+        m3Tried = true;
+        try {
+          const res3 = await jsonRpcCall<any>(
+            { url: this.url, authToken: this.authToken },
+            "lookup_invoice",
+            { payment_hash: paymentHash }
+          );
+          triedMethods = true;
+          const s = String(res3?.status || res3?.state || "").toLowerCase();
+          if (s === "settled" || s === "paid" || s === "succeeded") return { status: "settled" };
+          if (s === "failed" || s === "canceled" || s === "cancelled") {
+            return { status: "failed", error: res3?.error_message || "Lightning invoice failed" };
+          }
+        } catch (err: any) {
+          if (isCapabilityError(err)) {
+            m3Capability = true;
+          } else {
+            lastTransportError = err?.message || lastTransportError;
+          }
+        }
+      }
+
+      // If EVERY attempted probe this round was a real transport error
+      // (no capability miss, no successful call), bail honestly with
+      // unknown instead of looping until timeout. m3 is only counted
+      // when it actually ran — skipping it for "no hash" must NOT
+      // suppress the bail-out (architect finding).
+      const m3CountsAsCapability = !m3Tried || m3Capability;
+      if (!m1Capability && !m2Capability && !m3CountsAsCapability && lastTransportError && !triedMethods) {
         return { status: "unknown", error: lastTransportError };
       }
 
@@ -428,6 +468,11 @@ export class RealFiberClient implements FiberClient {
     lightningInvoice: string;
     lightningPaymentHash?: string;
   }): Promise<{ status: "settled" | "pending" | "failed" | "unknown"; error?: string }> {
-    return this.awaitLightningFulfillment(args.lightningInvoice, args.paymentResult.preimage, 8000);
+    return this.awaitLightningFulfillment(
+      args.lightningInvoice,
+      args.paymentResult.preimage,
+      8000,
+      args.lightningPaymentHash,
+    );
   }
 }

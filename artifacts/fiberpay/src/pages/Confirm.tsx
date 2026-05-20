@@ -101,6 +101,7 @@ export default function Confirm() {
         amountMsat: pendingInvoice.lightning.amountMsat,
         description: pendingInvoice.lightning.description,
         asset: newAsset,
+        lightningPaymentHash: pendingInvoice.lightning.paymentHash,
       });
       
       setPendingInvoice({

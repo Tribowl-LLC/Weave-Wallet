@@ -16,6 +16,7 @@ export interface FiberClient {
     amountMsat: number;
     description?: string;
     asset: AssetSymbol;
+    lightningPaymentHash?: string;
   }): Promise<FiberInvoice>;
   sendPayment(args: {
     invoice: FiberInvoice;

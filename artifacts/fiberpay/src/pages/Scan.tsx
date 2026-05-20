@@ -94,6 +94,7 @@ export default function Scan() {
         amountMsat: decoded.amountMsat,
         description: decoded.description,
         asset: selectedAsset,
+        lightningPaymentHash: decoded.paymentHash,
       });
 
       setPendingInvoice({
