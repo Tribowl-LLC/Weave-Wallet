@@ -5,6 +5,7 @@ import { ScanLine, Settings, Activity, ArrowUpRight, ArrowDownLeft, ChevronRight
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { getFiberClient } from "@/lib/fiber/client";
+import { subscribeFiberConnection, getFiberConnection } from "@/lib/fiber/connection";
 import { getAsset } from "@/lib/fiber/assets";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +15,11 @@ export default function Home() {
   const { unlocked, balances, setBalances, selectedAsset, setSelectedAsset } = useWalletStore();
   const { entries } = useActivityStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [connState, setConnState] = useState(getFiberConnection());
+
+  useEffect(() => {
+    return subscribeFiberConnection(setConnState);
+  }, []);
 
   useEffect(() => {
     if (!unlocked) {
@@ -74,6 +80,8 @@ export default function Home() {
   const otherBalanceStr = getUnformattedValue(otherAsset);
 
   const recentEntries = entries.slice(0, 3);
+  
+  const connColor = connState.status === "connected" ? "bg-green-500" : connState.status === "connecting" ? "bg-amber-500" : "bg-red-500";
 
   return (
     <motion.div 
@@ -83,7 +91,12 @@ export default function Home() {
       className="min-h-screen flex flex-col p-6 bg-background"
     >
       <header className="flex justify-between items-center mb-8 mt-4">
-        <h1 className="text-xl font-semibold tracking-tight">Wallet</h1>
+        <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
+          Wallet
+          <Link href="/settings">
+            <div className={`w-2 h-2 rounded-full ${connColor} shadow-sm opacity-80 cursor-pointer hover:opacity-100 transition-opacity`} />
+          </Link>
+        </h1>
         <Link href="/settings" className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors">
           <Settings className="w-5 h-5" />
         </Link>

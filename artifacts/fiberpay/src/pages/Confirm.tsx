@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Fingerprint, Loader2, ArrowLeftRight, XCircle } from "lucide-react";
+import { CheckCircle2, Fingerprint, Loader2, ArrowLeftRight, XCircle, AlertTriangle } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { authenticatePasskey } from "@/lib/passkey";
 import { formatUsd } from "@/lib/lightning";
-import { getFiberClient, FiberError } from "@/lib/fiber/client";
+import { getFiberClient, FiberError, FiberRpcError, reconnectFiber } from "@/lib/fiber/client";
 import { getAsset } from "@/lib/fiber/assets";
-import type { PaymentStage } from "@/lib/fiber/types";
+import type { PaymentStage, FiberConnectionState } from "@/lib/fiber/types";
+import { subscribeFiberConnection, getFiberConnection } from "@/lib/fiber/connection";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -23,6 +24,12 @@ export default function Confirm() {
   
   const [isSwitchingAsset, setIsSwitchingAsset] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+
+  const [connState, setConnState] = useState<FiberConnectionState>(getFiberConnection());
+  
+  useEffect(() => {
+    return subscribeFiberConnection(setConnState);
+  }, []);
 
   useEffect(() => {
     if (!unlocked || !pendingInvoice) {
@@ -104,9 +111,7 @@ export default function Confirm() {
     }
   };
 
-  const handlePay = async () => {
-    if (!canPay) return;
-    
+  const executePayment = async () => {
     setStage("authenticating");
     setStageDetail("Confirming with biometrics...");
     
@@ -160,7 +165,7 @@ export default function Confirm() {
       } catch (err: any) {
         updateEntry(activityId, {
           status: "failed",
-          errorCode: err instanceof FiberError ? err.code : "unknown",
+          errorCode: err instanceof FiberError || err instanceof FiberRpcError ? err.code : "unknown",
           errorMessage: err.message || "Payment failed",
         });
         
@@ -175,6 +180,35 @@ export default function Confirm() {
       toast.error("Authentication failed");
       setStage("idle");
     }
+  };
+
+  const handlePay = async () => {
+    if (!canPay) return;
+    
+    if (connState.status === "connecting") {
+      setStage("authenticating");
+      setStageDetail("Connecting to Fiber...");
+      
+      // wait up to 8s
+      const start = Date.now();
+      while (Date.now() - start < 8000) {
+        const current = getFiberConnection();
+        if (current.status === "connected") {
+          await executePayment();
+          return;
+        } else if (current.status === "error" || current.status === "disconnected") {
+          toast.error("Failed to connect to Fiber node");
+          setStage("idle");
+          return;
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+      toast.error("Connection timeout");
+      setStage("idle");
+      return;
+    }
+    
+    await executePayment();
   };
 
   return (
@@ -333,10 +367,19 @@ export default function Confirm() {
         )}
         {stage !== "settled" && stage !== "failed" && (
           <>
+            {connState.mode === "real" && (connState.status === "error" || connState.status === "disconnected") && (
+              <button 
+                onClick={reconnectFiber}
+                className="w-full flex items-center justify-center gap-2 p-3 bg-amber-500/10 text-amber-500 rounded-xl text-sm font-medium hover:bg-amber-500/20 transition-colors"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                Fiber node unreachable. Tap to retry.
+              </button>
+            )}
             <motion.button
               whileTap={stage === "idle" && canPay ? { scale: 0.97 } : undefined}
               onClick={handlePay}
-              disabled={stage !== "idle" || !canPay || isSwitchingAsset || isLoadingBalances}
+              disabled={stage !== "idle" || !canPay || isSwitchingAsset || isLoadingBalances || (connState.mode === "real" && (connState.status === "error" || connState.status === "disconnected"))}
               className="w-full h-16 bg-primary text-primary-foreground rounded-2xl font-semibold text-lg shadow-[0_8px_30px_rgba(22,201,83,0.3)] flex items-center justify-center gap-3 disabled:opacity-70 disabled:shadow-none transition-all"
             >
               {stage === "idle" ? (

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
@@ -11,6 +12,8 @@ import Confirm from "@/pages/Confirm";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
 import NotFound from "@/pages/not-found";
+
+import { bootstrapFiberConnection } from "@/lib/fiber/client";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +34,12 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    bootstrapFiberConnection().catch(err => {
+      console.error("[fiber] Bootstrap failed:", err);
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

@@ -1,6 +1,6 @@
 import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage } from "./types";
 import type { FiberClient } from "./client";
-import { MSAT_TO_USD_RATE } from "../lightning";
+import { msatToAssetUnits, msatToUsd } from "./conversion";
 import { getAsset } from "./assets";
 
 export class FiberError extends Error {
@@ -54,12 +54,9 @@ export class MockFiberClient implements FiberClient {
   }): Promise<FiberInvoice> {
     await new Promise(r => setTimeout(r, 250));
     
-    const amountUsd = args.amountMsat * MSAT_TO_USD_RATE;
+    const amountUsd = msatToUsd(args.amountMsat);
     const assetInfo = getAsset(args.asset);
-    
-    // Convert USD to asset amount considering decimals
-    const multiplier = 10 ** assetInfo.decimals;
-    const amount = BigInt(Math.floor(amountUsd * multiplier));
+    const amount = msatToAssetUnits(args.amountMsat, assetInfo);
 
     return {
       invoiceId: "fbi_" + crypto.randomUUID(),
@@ -123,3 +120,4 @@ export class MockFiberClient implements FiberClient {
     return () => this.handlers.delete(handler);
   }
 }
+

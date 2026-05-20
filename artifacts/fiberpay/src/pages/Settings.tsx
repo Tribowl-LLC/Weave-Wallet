@@ -1,18 +1,25 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trash2, Download, Shield, History, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Trash2, Download, Shield, History, RefreshCcw, Network } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getFiberClient } from "@/lib/fiber/client";
+import { getFiberClient, reconnectFiber, switchToMockFiber } from "@/lib/fiber/client";
+import { getFiberConnection, subscribeFiberConnection } from "@/lib/fiber/connection";
 
 export default function Settings() {
   const [, setLocation] = useLocation();
   const { reset, unlocked, setBalances } = useWalletStore();
   const { clearAll } = useActivityStore();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  
+  const [connState, setConnState] = useState(getFiberConnection());
+
+  useEffect(() => {
+    return subscribeFiberConnection(setConnState);
+  }, []);
 
   useEffect(() => {
     if (!unlocked) {
@@ -76,6 +83,11 @@ export default function Settings() {
     }
   };
 
+  const handleReconnect = async () => {
+    toast("Reconnecting...");
+    await reconnectFiber();
+  };
+
   if (!unlocked) return null;
 
   return (
@@ -95,9 +107,75 @@ export default function Settings() {
       <div className="space-y-6">
         <div className="bg-card border border-border/50 rounded-2xl p-4">
           <div className="flex items-center gap-3 mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wider px-2">
+            <Network className="w-4 h-4" />
+            Network
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${connState.status === 'connected' ? 'bg-green-500' : connState.status === 'connecting' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                <div className="font-medium text-sm">Mode</div>
+              </div>
+              <div className="text-sm font-medium bg-muted px-2 py-1 rounded-md">
+                {connState.mode === "mock" ? "Mock (simulated)" : "Real Fiber"}
+              </div>
+            </div>
+            
+            {connState.mode === "real" && (
+              <>
+                <div className="px-2 space-y-1">
+                  <div className="text-xs text-muted-foreground">Endpoint</div>
+                  <div className="text-sm font-mono truncate">{connState.endpoint || "Unknown"}</div>
+                </div>
+                {connState.nodeInfo && (
+                  <div className="px-2 space-y-1">
+                    <div className="text-xs text-muted-foreground">Node ID • {connState.nodeInfo.network}</div>
+                    <div className="text-xs font-mono truncate">{connState.nodeInfo.nodeId}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Channels: {connState.nodeInfo.channelCount} • Version: {connState.nodeInfo.version}</div>
+                  </div>
+                )}
+              </>
+            )}
+            
+            {connState.mode === "mock" && (
+              <p className="text-xs text-muted-foreground px-2">Set VITE_FIBER_RPC_URL to connect to a real Fiber node.</p>
+            )}
+
+            {connState.mode === "real" && connState.status === "error" && connState.lastError && (
+              <div className="px-3 py-2 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+                {connState.lastError}
+              </div>
+            )}
+
+            <Button 
+              variant="outline" 
+              className="w-full h-12 rounded-xl mt-2"
+              onClick={handleReconnect}
+              disabled={connState.status === "connecting"}
+            >
+              <RefreshCcw className={`w-4 h-4 mr-2 ${connState.status === "connecting" ? "animate-spin" : ""}`} />
+              Reconnect
+            </Button>
+
+            {connState.mode === "real" && connState.status === "error" && (
+              <Button
+                variant="ghost"
+                className="w-full h-11 rounded-xl text-muted-foreground"
+                onClick={() => { switchToMockFiber(); toast.success("Switched to simulated mode"); }}
+              >
+                Switch to simulated mode
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-card border border-border/50 rounded-2xl p-4">
+          <div className="flex items-center gap-3 mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wider px-2">
             <History className="w-4 h-4" />
             Activity
           </div>
+
           
           <div className="space-y-2">
             <Link href="/activity" className="w-full justify-start h-14 rounded-xl flex items-center px-4 bg-muted/30 hover:bg-muted/50 transition-colors">
