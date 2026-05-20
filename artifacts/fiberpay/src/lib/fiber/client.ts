@@ -1,4 +1,4 @@
-import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberNodeInfo, FiberConnectionState, LightningStatus } from "./types";
+import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberNodeInfo, FiberConnectionState, LightningStatus, FiberReceiveAddress, FiberChannel } from "./types";
 import { MockFiberClient } from "./mock-client";
 import { RealFiberClient } from "./real-client";
 import { getFiberConnection, setFiberConnection } from "./connection";
@@ -32,6 +32,13 @@ export interface FiberClient {
   onStage?(handler: (stage: PaymentStage, detail?: string) => void): () => void;
   getNodeInfo?(): Promise<FiberNodeInfo>;
   healthCheck?(): Promise<boolean>;
+  // Return a CKB on-chain address the user can deposit UDT into so they
+  // can fund channels. Optional: not every node build exposes this — the
+  // implementation may return a fallback marker the UI will warn about.
+  getReceiveAddress?(): Promise<FiberReceiveAddress>;
+  // Lightweight channel listing for the Fund / Channel-Open UIs. Optional
+  // for the same reason; consumers should treat absence as "we don't know".
+  listChannels?(): Promise<FiberChannel[]>;
 }
 
 let cached: FiberClient | null = null;

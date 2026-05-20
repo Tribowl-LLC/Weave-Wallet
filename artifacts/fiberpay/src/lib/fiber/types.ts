@@ -62,6 +62,24 @@ export interface FiberNodeInfo {
   syncedBlock: number | null;
 }
 
+export interface FiberReceiveAddress {
+  // CKB on-chain address the user can send UDT deposits to
+  address: string;
+  network: string;
+  // True when the client could only return a placeholder (e.g. real node
+  // didn't expose a deposit-address RPC) — the UI should warn the user.
+  isFallback?: boolean;
+}
+
+export interface FiberChannel {
+  channelId: string;
+  peerNodeId: string;
+  asset: AssetSymbol | "CKB" | "unknown";
+  localBalance: bigint;     // in asset's smallest units
+  remoteBalance: bigint;
+  state: "open" | "pending" | "closing" | "closed" | "unknown";
+}
+
 export interface FiberConnectionState {
   mode: FiberMode;
   status: FiberConnectionStatus;

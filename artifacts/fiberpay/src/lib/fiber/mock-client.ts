@@ -1,4 +1,4 @@
-import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage } from "./types";
+import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberReceiveAddress, FiberChannel } from "./types";
 import type { FiberClient } from "./client";
 import { msatToAssetUnits, msatToUsd } from "./conversion";
 import { getAsset } from "./assets";
@@ -157,6 +157,42 @@ export class MockFiberClient implements FiberClient {
   onStage(handler: (stage: PaymentStage, detail?: string) => void): () => void {
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
+  }
+
+  // Returns a stable fake testnet CKB address so the Fund-My-Node UI has
+  // something real to QR-encode in test mode. We also expose a small
+  // helper localStorage knob the UI can poke to simulate deposits.
+  async getReceiveAddress(): Promise<FiberReceiveAddress> {
+    await new Promise(r => setTimeout(r, 120));
+    const KEY = "fiberpay.mock.deposit_address";
+    let addr = localStorage.getItem(KEY);
+    if (!addr) {
+      const tail = Array.from(crypto.getRandomValues(new Uint8Array(20)))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+      addr = "ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsq" + tail;
+      localStorage.setItem(KEY, addr);
+    }
+    return { address: addr, network: "testnet", isFallback: false };
+  }
+
+  // Simulated channels for the channel-open guidance step. By default an
+  // empty array (mirrors a freshly-funded node with no channels yet); the
+  // user can flip a localStorage flag from the UI to pretend they've
+  // opened a channel.
+  async listChannels(): Promise<FiberChannel[]> {
+    await new Promise(r => setTimeout(r, 150));
+    const opened = localStorage.getItem("fiberpay.mock.channel_opened") === "1";
+    if (!opened) return [];
+    return [
+      {
+        channelId: "0xmock_channel_" + "0".repeat(48),
+        peerNodeId: "0xmock_peer_" + "0".repeat(50),
+        asset: "RUSD",
+        localBalance: 200_000000n,
+        remoteBalance: 50_000000n,
+        state: "open",
+      },
+    ];
   }
 }
 

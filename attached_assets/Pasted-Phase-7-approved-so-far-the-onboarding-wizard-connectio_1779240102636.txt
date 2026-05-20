@@ -1,0 +1,35 @@
+Phase 7 approved so far — the onboarding wizard, connection management, and node guidance look excellent.
+Now complete the expanded Phase 7: Node Setup & Onboarding Polish + “Fund My Node” Features
+Goal: Make the entire self-hosted node experience feel approachable and guided for early adopters, including funding the node.
+Requirements (build on existing work):
+1.  “Fund My Node” Screen (new or integrated into onboarding)
+	•  Shows the user’s Fiber node’s receive address (queried via RPC)
+	•  Large QR code for easy deposit from another wallet/exchange
+	•  Current node balance (live-updating)
+	•  Recommended deposit amounts (e.g. “$50–200 RUSD to start”)
+	•  Testnet faucet links (RUSD/USDI)
+	•  “I’ve funded” button that checks balance and moves to next step
+2.  Enhanced Onboarding Wizard
+	•  Step 1: Welcome + non-custodial explanation
+	•  Step 2: Run your Fiber node (Docker Compose one-click copy)
+	•  Step 3: Fund My Node (the new screen above)
+	•  Step 4: Connect wallet to node + test connection
+	•  Step 5: Open first channel (guided RPC call or instructions)
+3.  Real-time Monitoring
+	•  Poll node balance periodically when on Fund screen
+	•  Auto-advance when sufficient funds detected
+	•  Clear status messages (“Waiting for deposit…”, “Funds received! Ready to open channels”)
+4.  Channel Opening Guidance
+	•  After funding, show simple “Open Channel” helper with recommended peer/node and amount
+	•  Link to Fiber docs for advanced users
+5.  Polish & Guidance
+	•  Friendly, non-technical copy throughout
+	•  Progress indicators and checkmarks
+	•  Help text for common issues (low balance, sync delay, etc.)
+Technical Notes:
+•  Reuse existing real-client RPC methods
+•  Keep mock mode support (fake address + balance simulation)
+•  Maintain Passkey flow and self-hosted model
+•  Update Home screen banner to guide new users to onboarding if needed
+Start with the new Fund My Node screen + integration into the onboarding wizard, then the channel guidance.
+Show me the updated files when ready.

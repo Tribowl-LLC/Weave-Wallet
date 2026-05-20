@@ -1,4 +1,4 @@
-import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberNodeInfo } from "./types";
+import type { AssetSymbol, FiberBalance, FiberInvoice, PaymentResult, PaymentStage, FiberNodeInfo, FiberReceiveAddress, FiberChannel } from "./types";
 import { FiberRpcError } from "./types";
 import type { FiberClient } from "./client";
 import { jsonRpcCall } from "./json-rpc";
@@ -56,6 +56,106 @@ export class RealFiberClient implements FiberClient {
       channelCount: result?.channel_count || 0,
       syncedBlock: isNaN(syncedBlock as number) ? null : (syncedBlock as number),
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Deposit address discovery
+  //
+  // There is no single canonical "give me a deposit address" RPC across
+  // fnn builds — some expose `get_deposit_address`, some `wallet_address`,
+  // some only surface it through node_info. We try a couple of plausible
+  // method names; if none respond we return a clearly-marked fallback so
+  // the UI can prompt the user to look it up in their node directly
+  // instead of silently showing a wrong address (funds-at-risk).
+  // ─────────────────────────────────────────────────────────────────────
+  async getReceiveAddress(): Promise<FiberReceiveAddress> {
+    const opts = { url: this.url, authToken: this.authToken, timeoutMs: 6000 };
+    const candidates = ["get_deposit_address", "wallet_address", "get_receive_address"];
+    let network = "unknown";
+
+    // Try to learn the network from node_info first. If even node_info
+    // can't reach the node, we are transport-failed — surface that
+    // explicitly so the UI can show "node unreachable" rather than the
+    // misleading "RPC not supported" fallback.
+    try {
+      const info = await jsonRpcCall<any>(opts, "node_info");
+      network = info?.network || network;
+    } catch (err: any) {
+      throw new FiberRpcError(
+        String(err?.code ?? "network"),
+        err?.message || "Cannot reach your Fiber node",
+        err
+      );
+    }
+
+    // Treat ONLY method-not-found style errors as capability misses; any
+    // other failure (timeout, auth, transport) propagates so the caller
+    // can distinguish "no such RPC on this build" from "node is down".
+    const isCapabilityError = (err: any): boolean => {
+      const code = String(err?.code ?? "");
+      if (code === "-32601" || code === "method_not_found") return true;
+      if (code === "rpc_error" || code === "network") {
+        return /method (not found|missing|unknown)|unknown method|no such method/i.test(String(err?.message));
+      }
+      return false;
+    };
+
+    let lastTransportError: any = null;
+    for (const method of candidates) {
+      try {
+        const res = await jsonRpcCall<any>(opts, method);
+        const addr = typeof res === "string"
+          ? res
+          : (res?.address || res?.deposit_address || res?.ckb_address);
+        if (addr && typeof addr === "string" && addr.length > 0) {
+          return { address: addr, network, isFallback: false };
+        }
+      } catch (err: any) {
+        if (isCapabilityError(err)) continue;
+        lastTransportError = err;
+      }
+    }
+
+    if (lastTransportError) {
+      throw new FiberRpcError(
+        String(lastTransportError.code ?? "network"),
+        lastTransportError.message || "Couldn't fetch deposit address",
+        lastTransportError
+      );
+    }
+
+    // All candidates legitimately said "method not found" — this build
+    // doesn't expose a deposit-address RPC, so return a marked fallback.
+    return { address: "", network, isFallback: true };
+  }
+
+  async listChannels(): Promise<FiberChannel[]> {
+    const opts = { url: this.url, authToken: this.authToken };
+    const channels = await jsonRpcCall<any[]>(opts, "list_channels");
+    const out: FiberChannel[] = [];
+    for (const c of channels || []) {
+      // Map UDT type-hash → asset symbol; "CKB" if no UDT script.
+      let asset: FiberChannel["asset"] = "unknown";
+      if (!c.udt_type_script) asset = "CKB";
+      else if (c.udt_type_script === ASSET_REGISTRY.RUSD.typeHash) asset = "RUSD";
+      else if (c.udt_type_script === ASSET_REGISTRY.USDI.typeHash) asset = "USDI";
+
+      const stateRaw = String(c.state ?? c.status ?? "").toLowerCase();
+      let state: FiberChannel["state"] = "unknown";
+      if (stateRaw.includes("open") || stateRaw === "active" || stateRaw === "channelready") state = "open";
+      else if (stateRaw.includes("pend") || stateRaw === "negotiating") state = "pending";
+      else if (stateRaw.includes("clos")) state = stateRaw === "closed" ? "closed" : "closing";
+
+      out.push({
+        channelId: c.channel_id || c.id || "",
+        peerNodeId: c.peer_id || c.peer_node_id || c.remote_node_id || "",
+        asset,
+        localBalance: c.local_balance ? BigInt(c.local_balance) : 0n,
+        remoteBalance: c.remote_balance ? BigInt(c.remote_balance) : 0n,
+        state,
+      });
+    }
+    return out;
   }
 
   async healthCheck(): Promise<boolean> {
