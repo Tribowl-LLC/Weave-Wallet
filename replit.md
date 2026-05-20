@@ -7,9 +7,19 @@ A non-custodial PWA that lets you scan a Lightning invoice and pay it from your 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
+- `pnpm test` — run all workspace test suites
+- `pnpm --filter @workspace/fiberpay run test` — run the WeaveWallet test suite once (Vitest)
+- `pnpm --filter @workspace/fiberpay run test:watch` — re-run tests on change
+- `pnpm --filter @workspace/fiberpay run test:coverage` — generate a coverage report (`coverage/index.html`)
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+
+### Testing
+- **Vitest + jsdom + @testing-library/react** under `artifacts/fiberpay/src/**/*.test.ts(x)`, colocated with the code under test.
+- Setup file `src/test/setup.ts` stubs `navigator.vibrate`, `navigator.onLine`, `HTMLAnchorElement.click`, and clears `localStorage` between tests.
+- Coverage focus is **business logic, not UI pixels**: `lightning.ts` (bolt11 decode + USD conversion), `errors.ts` (friendly error mapper, all branches), `exportActivity.ts` (CSV BOM + formula-injection guard + JSON envelope), `fiber/connection.ts` (subscribe/patch), `fiber/conversion.ts`, `fiber/mock-client.ts` (4 lightning-status branches, refund paths, insufficient balance — randomness stubbed for determinism), `fiber/client.ts` (signature-based caching), and `components/OfflineBanner.tsx` as a smoke test for the offline UX.
+- `bolt11` is mocked in `lightning.test.ts` so tests don't break when the upstream library tightens checksum validation.
 
 ### Fiber Configuration
 - The app uses a user-node-first architecture where the user configures the Fiber RPC connection within the Settings screen of the app.
