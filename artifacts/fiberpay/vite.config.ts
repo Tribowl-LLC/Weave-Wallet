@@ -47,8 +47,10 @@ export default defineConfig({
         theme_color: "#16c953",
         background_color: "#0a0a0a",
         display: "standalone",
-        start_url: "/",
-        scope: "/",
+        // Base-relative so the installed PWA scope follows whatever
+        // BASE_PATH this artifact is mounted at by the shared proxy.
+        start_url: "./",
+        scope: "./",
         icons: [
           {
             src: "icon-512.png",

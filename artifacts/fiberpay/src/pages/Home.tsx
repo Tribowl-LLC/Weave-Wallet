@@ -1,21 +1,54 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ScanLine, Settings, Activity, ArrowUpRight, ArrowDownLeft, ChevronRight } from "lucide-react";
+import { ScanLine, Settings, Activity, ArrowUpRight, ArrowDownLeft, ChevronRight, FlaskConical, Download, X } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { getFiberClient } from "@/lib/fiber/client";
 import { subscribeFiberConnection, getFiberConnection } from "@/lib/fiber/connection";
 import { getAsset } from "@/lib/fiber/assets";
+import { haptic } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { unlocked, balances, setBalances, selectedAsset, setSelectedAsset } = useWalletStore();
+  const { unlocked, hasOnboarded, balances, setBalances, selectedAsset, setSelectedAsset, installPromptDismissed, setInstallPromptDismissed } = useWalletStore();
   const { entries } = useActivityStore();
   const [isLoading, setIsLoading] = useState(false);
   const [connState, setConnState] = useState(getFiberConnection());
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Capture the install prompt event so we can offer the user a one-tap
+  // "Add to Home Screen" inside our own UI (Android Chromium browsers).
+  // iOS Safari never fires this; the dedicated iOS install hint lives in
+  // Settings to keep Home uncluttered.
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    haptic.tap();
+    try {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success("FiberPay installed");
+      }
+    } catch {
+      // user dismissed or browser blocked
+    } finally {
+      setInstallPrompt(null);
+    }
+  };
 
   useEffect(() => {
     return subscribeFiberConnection(setConnState);
@@ -24,6 +57,10 @@ export default function Home() {
   useEffect(() => {
     if (!unlocked) {
       setLocation("/");
+      return;
+    }
+    if (!hasOnboarded) {
+      setLocation("/onboarding");
       return;
     }
     
@@ -49,7 +86,7 @@ export default function Home() {
     fetchBalances();
     
     return () => { isMounted = false; };
-  }, [unlocked, setLocation, setBalances]);
+  }, [unlocked, hasOnboarded, setLocation, setBalances]);
 
   if (!unlocked) return null;
 
@@ -83,7 +120,11 @@ export default function Home() {
   
   const connColor = connState.status === "connected" ? "bg-green-500" : connState.status === "connecting" ? "bg-amber-500" : "bg-red-500";
 
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Surface "Test Mode" prominently whenever we're using simulated
+  // balances/payments OR any recent payment has an unverified LN leg.
+  const hasUnverifiedLn = entries.slice(0, 5).some(e => e.lightningStatus === "unknown" || e.lightningStatus === "pending");
+  const showTestModeBanner = connState.mode === "mock";
+  const showInstallBanner = !!installPrompt && !installPromptDismissed;
 
   return (
     <motion.div 
@@ -103,6 +144,61 @@ export default function Home() {
           <Settings className="w-5 h-5" />
         </Link>
       </header>
+
+      {showTestModeBanner && (
+        <div
+          onClick={() => setLocation("/settings")}
+          className="mb-4 flex items-center gap-3 bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3 cursor-pointer hover:bg-amber-400/15 transition-colors"
+          role="button"
+          aria-label="Test mode active. Open Settings to connect your node."
+        >
+          <FlaskConical className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-amber-400">Test mode</div>
+            <div className="text-xs text-muted-foreground truncate">Simulated payments. Tap to connect your Fiber node.</div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-amber-400/70 shrink-0" />
+        </div>
+      )}
+
+      {hasUnverifiedLn && !showTestModeBanner && (
+        <div
+          onClick={() => setLocation("/activity")}
+          className="mb-4 flex items-center gap-3 bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3 cursor-pointer hover:bg-amber-400/15 transition-colors"
+          role="button"
+          aria-label="A recent payment has an unverified Lightning leg. Open activity."
+        >
+          <FlaskConical className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-amber-400">Lightning leg unverified</div>
+            <div className="text-xs text-muted-foreground truncate">A recent payment is pending confirmation. Tap to review.</div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-amber-400/70 shrink-0" />
+        </div>
+      )}
+
+      {showInstallBanner && (
+        <div className="mb-4 flex items-center gap-3 bg-primary/10 border border-primary/30 rounded-2xl p-3">
+          <Download className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-primary">Install FiberPay</div>
+            <div className="text-xs text-muted-foreground truncate">Add to your home screen for one-tap access.</div>
+          </div>
+          <button
+            onClick={handleInstall}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Install
+          </button>
+          <button
+            onClick={() => { setInstallPromptDismissed(true); }}
+            aria-label="Dismiss install prompt"
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-muted/40 text-muted-foreground transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {!bannerDismissed && connState.mode === "real" && connState.status === "error" && (
         <div 

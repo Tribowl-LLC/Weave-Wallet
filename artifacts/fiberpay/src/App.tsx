@@ -11,6 +11,7 @@ import Scan from "@/pages/Scan";
 import Confirm from "@/pages/Confirm";
 import Settings from "@/pages/Settings";
 import Activity from "@/pages/Activity";
+import Onboarding from "@/pages/Onboarding";
 import NotFound from "@/pages/not-found";
 
 import { bootstrapFiberConnection } from "@/lib/fiber/client";
@@ -22,6 +23,7 @@ function Router() {
     <AnimatePresence mode="wait">
       <Switch>
         <Route path="/" component={SplashAuth} />
+        <Route path="/onboarding" component={Onboarding} />
         <Route path="/home" component={Home} />
         <Route path="/scan" component={Scan} />
         <Route path="/confirm" component={Confirm} />

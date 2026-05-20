@@ -9,14 +9,14 @@ import { toast } from "sonner";
 
 export default function SplashAuth() {
   const [, setLocation] = useLocation();
-  const { credentialId, unlocked, setCredential, setUnlocked } = useWalletStore();
+  const { credentialId, unlocked, hasOnboarded, setCredential, setUnlocked } = useWalletStore();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (credentialId && unlocked) {
-      setLocation("/home");
+      setLocation(hasOnboarded ? "/home" : "/onboarding");
     }
-  }, [credentialId, unlocked, setLocation]);
+  }, [credentialId, unlocked, hasOnboarded, setLocation]);
 
   const handleCreateWallet = async () => {
     setIsLoading(true);
@@ -26,7 +26,7 @@ export default function SplashAuth() {
       setCredential(newCredentialId, userHandle);
       setUnlocked(true);
       toast.success("Wallet created securely");
-      setLocation("/home");
+      setLocation(hasOnboarded ? "/home" : "/onboarding");
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to create wallet");
@@ -41,7 +41,7 @@ export default function SplashAuth() {
     try {
       await authenticatePasskey(credentialId);
       setUnlocked(true);
-      setLocation("/home");
+      setLocation(hasOnboarded ? "/home" : "/onboarding");
     } catch (err: any) {
       console.error(err);
       toast.error("Authentication failed");
@@ -52,7 +52,7 @@ export default function SplashAuth() {
 
   const handleDemoMode = () => {
     setUnlocked(true);
-    setLocation("/home");
+    setLocation(hasOnboarded ? "/home" : "/onboarding");
   };
 
   const biometricsAvailable = isBiometricsAvailable();

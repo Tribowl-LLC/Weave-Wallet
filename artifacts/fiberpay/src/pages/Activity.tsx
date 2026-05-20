@@ -6,19 +6,31 @@ import { useActivityStore } from "@/store/activity";
 import { getAsset } from "@/lib/fiber/assets";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, label = "Value" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
-  
-  const handleCopy = (e: React.MouseEvent) => {
+
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Surface the failure instead of leaving the user wondering why
+      // nothing happened (Safari can block clipboard outside user gestures
+      // in some contexts).
+      toast.error(`Couldn't copy ${label.toLowerCase()}`);
+    }
   };
 
   return (
-    <button onClick={handleCopy} className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground">
+    <button
+      onClick={handleCopy}
+      aria-label={`Copy ${label}`}
+      className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+    >
       {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
     </button>
   );
@@ -92,7 +104,10 @@ export default function ActivityPage() {
                   <DrawerHeader className="text-left pb-2">
                     <DrawerTitle className="text-xl">Transaction Details</DrawerTitle>
                     <DrawerDescription>
-                      {new Date(entry.createdAt).toLocaleString()}
+                      Created {new Date(entry.createdAt).toLocaleString()}
+                      {entry.settledAt && (
+                        <> · Settled {new Date(entry.settledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</>
+                      )}
                     </DrawerDescription>
                   </DrawerHeader>
                   <div className="p-4 space-y-6">
@@ -116,9 +131,10 @@ export default function ActivityPage() {
                     </div>
 
                     <div className="space-y-3">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-1">Fiber leg</div>
                       <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
-                        <span className="text-muted-foreground">ID</span>
-                        <span className="font-mono text-xs">{entry.id}</span>
+                        <span className="text-muted-foreground">Payment ID</span>
+                        <span className="font-mono text-xs truncate max-w-[180px]">{entry.id}</span>
                       </div>
                       {entry.fiberTxHash && (
                         <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
@@ -129,34 +145,51 @@ export default function ActivityPage() {
                           </div>
                         </div>
                       )}
+                      {entry.errorMessage && (
+                        <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
+                          <span className="text-muted-foreground">Error</span>
+                          <div className="text-right max-w-[200px]">
+                            <div className="text-red-400">{entry.errorMessage}</div>
+                            {entry.errorCode && (
+                              <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{entry.errorCode}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-3">Lightning leg</div>
+                      {entry.lightningStatus && (
+                        <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
+                          <span className="text-muted-foreground">Status</span>
+                          <span className={`text-right max-w-[200px] font-medium ${
+                            entry.lightningStatus === 'settled' ? 'text-primary' :
+                            entry.lightningStatus === 'failed' ? 'text-amber-500' :
+                            entry.lightningStatus === 'unknown' ? 'text-muted-foreground' :
+                            'text-amber-400'
+                          }`}>
+                            {entry.lightningStatus === 'settled' ? 'Settled' :
+                             entry.lightningStatus === 'pending' ? 'Pending confirmation' :
+                             entry.lightningStatus === 'failed' ? (entry.lightningError || 'Failed') :
+                             entry.lightningError ? `Unverified: ${entry.lightningError}` : 'Unverified'}
+                          </span>
+                        </div>
+                      )}
                       {entry.preimage && (
                         <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
-                          <span className="text-muted-foreground">Lightning Preimage</span>
+                          <span className="text-muted-foreground">Preimage</span>
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs truncate max-w-[150px]">{entry.preimage}</span>
                             <CopyButton text={entry.preimage} />
                           </div>
                         </div>
                       )}
-                      {entry.errorMessage && (
+                      {entry.lightningPaymentHash && (
                         <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
-                          <span className="text-muted-foreground">Error</span>
-                          <span className="text-red-400 text-right max-w-[200px]">{entry.errorMessage}</span>
-                        </div>
-                      )}
-                      {entry.status === 'settled' && entry.lightningStatus && entry.lightningStatus !== 'settled' && (
-                        <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">
-                          <span className="text-muted-foreground">Lightning</span>
-                          <span className={`text-right max-w-[200px] font-medium ${
-                            entry.lightningStatus === 'failed' ? 'text-amber-500' :
-                            entry.lightningStatus === 'unknown' ? 'text-muted-foreground' :
-                            'text-amber-400'
-                          }`}>
-                            {entry.lightningStatus === 'pending' ? 'Pending confirmation' :
-                             entry.lightningStatus === 'failed' ? (entry.lightningError || 'Failed') :
-                             entry.lightningStatus === 'unknown' ? (entry.lightningError ? `Unverified: ${entry.lightningError}` : 'Unverified') :
-                             'Unknown'}
-                          </span>
+                          <span className="text-muted-foreground">Payment hash</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs truncate max-w-[150px]">{entry.lightningPaymentHash}</span>
+                            <CopyButton text={entry.lightningPaymentHash} />
+                          </div>
                         </div>
                       )}
                       <div className="flex items-center justify-between text-sm py-2 border-b border-border/30">

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Fingerprint, Loader2, ArrowLeftRight, XCircle, AlertTriangle, RotateCw } from "lucide-react";
+import { CheckCircle2, Fingerprint, Loader2, ArrowLeftRight, XCircle, AlertTriangle, RotateCw, Share2, Copy } from "lucide-react";
 import { useWalletStore } from "@/store/wallet";
 import { useActivityStore } from "@/store/activity";
 import { authenticatePasskey } from "@/lib/passkey";
 import { formatUsd } from "@/lib/lightning";
+import { haptic } from "@/lib/haptics";
 import { getFiberClient, FiberError, FiberRpcError, reconnectFiber } from "@/lib/fiber/client";
 import { getAsset } from "@/lib/fiber/assets";
 import type { PaymentStage, FiberConnectionState, PaymentResult, LightningStatus } from "@/lib/fiber/types";
@@ -177,6 +178,8 @@ export default function Confirm() {
           result.lightningStatus === "failed" ? "Lightning settlement failed" :
           "Lightning settlement pending"
         );
+        if (result.lightningStatus === "settled") haptic.success();
+        else haptic.warning();
         refreshBalances();
         
       } catch (err: any) {
@@ -187,6 +190,7 @@ export default function Confirm() {
         });
         
         setStage("failed");
+        haptic.error();
         let displayError = err.message || "Payment failed";
         if (err instanceof FiberRpcError && ["network", "timeout", "unreachable"].includes(err.code)) {
            displayError = "Cannot reach your Fiber node — is it still running?";
@@ -200,6 +204,47 @@ export default function Confirm() {
       console.error(err);
       toast.error("Authentication failed");
       setStage("idle");
+    }
+  };
+
+  const shareReceipt = async () => {
+    if (!settledResult || !pendingInvoice) return;
+    haptic.tap();
+    const text = [
+      `FiberPay receipt`,
+      `${fiberAmountFormatted} ${currentAsset} (${formattedUsd})`,
+      pendingInvoice.lightning.description ? `Memo: ${pendingInvoice.lightning.description}` : "",
+      `Fiber tx: ${settledResult.fiberTxHash}`,
+      `Preimage: ${settledResult.preimage}`,
+      `Lightning: ${settledResult.lightningStatus}`,
+      `When: ${new Date(settledResult.settledAt).toLocaleString()}`,
+    ].filter(Boolean).join("\n");
+
+    // Prefer the native share sheet on mobile; otherwise fall back to
+    // clipboard so this works on every browser.
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).share) {
+        await (navigator as any).share({ title: "FiberPay receipt", text });
+        return;
+      }
+    } catch {
+      // user cancelled or share not allowed — fall through to clipboard
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Receipt copied to clipboard");
+    } catch {
+      toast.error("Couldn't copy receipt");
+    }
+  };
+
+  const copyValue = async (value: string, label: string) => {
+    haptic.tap();
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error(`Couldn't copy ${label.toLowerCase()}`);
     }
   };
 
@@ -230,12 +275,14 @@ export default function Confirm() {
         });
       }
       if (res.status === "settled") {
+        haptic.success();
         toast.success("Lightning invoice confirmed");
       } else if (res.status === "pending") {
         toast.info("Still pending — give it another moment");
       } else if (res.status === "unknown") {
         toast.info(res.error ? `Couldn't verify: ${res.error}` : "Couldn't verify with your node");
       } else if (res.status === "failed") {
+        haptic.error();
         toast.error(res.error || "Lightning settlement failed");
       }
     } catch (err: any) {
@@ -385,13 +432,27 @@ export default function Confirm() {
                           <span className="text-muted-foreground">USD</span>
                           <span className="font-mono text-foreground">{formattedUsd}</span>
                         </div>
-                        <div className="flex justify-between text-xs gap-3">
+                        <div className="flex justify-between items-center text-xs gap-3">
                           <span className="text-muted-foreground shrink-0">Fiber tx</span>
-                          <span className="font-mono text-foreground truncate">{settledResult.fiberTxHash.slice(0, 10)}…{settledResult.fiberTxHash.slice(-6)}</span>
+                          <button
+                            onClick={() => copyValue(settledResult.fiberTxHash, "Fiber tx")}
+                            className="font-mono text-foreground truncate flex items-center gap-1.5 hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 rounded"
+                            aria-label="Copy Fiber transaction hash"
+                          >
+                            <span className="truncate">{settledResult.fiberTxHash.slice(0, 10)}…{settledResult.fiberTxHash.slice(-6)}</span>
+                            <Copy className="w-3 h-3 opacity-60" />
+                          </button>
                         </div>
-                        <div className="flex justify-between text-xs gap-3">
+                        <div className="flex justify-between items-center text-xs gap-3">
                           <span className="text-muted-foreground shrink-0">Preimage</span>
-                          <span className="font-mono text-foreground truncate">{settledResult.preimage.slice(0, 10)}…{settledResult.preimage.slice(-6)}</span>
+                          <button
+                            onClick={() => copyValue(settledResult.preimage, "Preimage")}
+                            className="font-mono text-foreground truncate flex items-center gap-1.5 hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 rounded"
+                            aria-label="Copy Lightning preimage"
+                          >
+                            <span className="truncate">{settledResult.preimage.slice(0, 10)}…{settledResult.preimage.slice(-6)}</span>
+                            <Copy className="w-3 h-3 opacity-60" />
+                          </button>
                         </div>
                         {settledResult.lightningError && (
                           <div className="flex justify-between text-xs gap-3 pt-1 border-t border-border/30">
@@ -509,15 +570,25 @@ export default function Confirm() {
       <div className="mt-auto pt-6 w-full max-w-sm mx-auto z-10 space-y-3">
         {stage === "settled" && (
           <>
-            <Button
-              onClick={() => {
-                setPendingInvoice(null);
-                setLocation("/activity");
-              }}
-              className="w-full h-14 rounded-2xl text-md bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_8px_30px_rgba(22,201,83,0.25)]"
-            >
-              View in activity
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setPendingInvoice(null);
+                  setLocation("/activity");
+                }}
+                className="flex-1 h-14 rounded-2xl text-md bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_8px_30px_rgba(22,201,83,0.25)]"
+              >
+                View in activity
+              </Button>
+              <Button
+                variant="outline"
+                onClick={shareReceipt}
+                aria-label="Share receipt"
+                className="h-14 w-14 rounded-2xl shrink-0 border-border/60"
+              >
+                <Share2 className="w-5 h-5" />
+              </Button>
+            </div>
             <Button
               variant="ghost"
               className="w-full h-12 rounded-2xl text-muted-foreground"
