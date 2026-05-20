@@ -84,7 +84,10 @@ export class MockFiberClient implements FiberClient {
     balances[args.invoice.asset] -= args.invoice.amount;
     this.saveBalances(balances);
 
-    notify("routing", "Finding route on Fiber network...");
+    notify("creating_invoice", "Creating Fiber invoice...");
+    await new Promise(r => setTimeout(r, 350));
+
+    notify("routing", "Sending payment on Fiber...");
     await new Promise(r => setTimeout(r, 900));
 
     if (Math.random() < 0.05) {
@@ -95,7 +98,7 @@ export class MockFiberClient implements FiberClient {
       throw new FiberError("routing_failed", "No route found on Fiber network");
     }
 
-    notify("settling", "Settling via Lightning...");
+    notify("settling", "Fulfilling Lightning invoice...");
     await new Promise(r => setTimeout(r, 700));
 
     if (Math.random() < 0.03) {

@@ -21,6 +21,7 @@ export default function Confirm() {
   const [stage, setStage] = useState<PaymentStage>("idle");
   const [stageDetail, setStageDetail] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [settledDetails, setSettledDetails] = useState<{ fiberTxHash: string; preimage: string } | null>(null);
   
   const [isSwitchingAsset, setIsSwitchingAsset] = useState(false);
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
@@ -158,6 +159,7 @@ export default function Confirm() {
           settledAt: result.settledAt,
         });
         
+        setSettledDetails({ fiberTxHash: result.fiberTxHash, preimage: result.preimage });
         setStage("settled");
         setStageDetail("Lightning invoice fulfilled");
         refreshBalances();
@@ -232,17 +234,37 @@ export default function Confirm() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", damping: 15, stiffness: 200 }}
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center w-full"
             >
               <div className="w-24 h-24 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(22,201,83,0.3)]">
                 <CheckCircle2 className="w-12 h-12" />
               </div>
-              <h2 className="text-3xl font-bold mb-2">Payment sent</h2>
+              <h2 className="text-3xl font-bold mb-2">Payment sent successfully</h2>
               <p className="text-2xl font-semibold text-foreground mb-1">{formattedUsd} <span className="text-base text-muted-foreground font-medium">in {currentAsset}</span></p>
-              <p className="text-sm text-muted-foreground max-w-[260px] mt-3 mb-4 leading-relaxed">
-                Lightning invoice fulfilled. The merchant should see it as paid shortly.
+              <p className="text-sm text-muted-foreground max-w-[280px] mt-3 mb-6 leading-relaxed">
+                Lightning invoice should be fulfilled shortly.
               </p>
-              <p className="text-xs text-muted-foreground/60 font-mono">Fiber tx {pendingInvoice.fiber.paymentHash.slice(0, 10)}...{pendingInvoice.fiber.paymentHash.slice(-6)}</p>
+              {settledDetails && (
+                <div className="w-full bg-card border border-border/50 rounded-2xl p-4 space-y-3 text-left">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Transaction</div>
+                  <div className="flex justify-between text-xs gap-3">
+                    <span className="text-muted-foreground">Asset</span>
+                    <span className="font-mono text-foreground">{fiberAmountFormatted} {currentAsset}</span>
+                  </div>
+                  <div className="flex justify-between text-xs gap-3">
+                    <span className="text-muted-foreground">USD</span>
+                    <span className="font-mono text-foreground">{formattedUsd}</span>
+                  </div>
+                  <div className="flex justify-between text-xs gap-3">
+                    <span className="text-muted-foreground shrink-0">Fiber tx</span>
+                    <span className="font-mono text-foreground truncate">{settledDetails.fiberTxHash.slice(0, 10)}…{settledDetails.fiberTxHash.slice(-6)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs gap-3">
+                    <span className="text-muted-foreground shrink-0">Preimage</span>
+                    <span className="font-mono text-foreground truncate">{settledDetails.preimage.slice(0, 10)}…{settledDetails.preimage.slice(-6)}</span>
+                  </div>
+                </div>
+              )}
             </motion.div>
           ) : stage === "failed" ? (
             <motion.div 
@@ -402,7 +424,7 @@ export default function Confirm() {
                 <>
                   <Loader2 className="w-6 h-6 animate-spin" />
                   <div className="flex flex-col items-start text-left">
-                    <span>{stage === "creating_invoice" ? "Preparing payment..." : stage === "routing" ? "Routing on Fiber..." : stage === "settling" ? "Fulfilling Lightning invoice..." : stage === "authenticating" ? "Authorizing..." : "Sending payment..."}</span>
+                    <span>{stage === "creating_invoice" ? "Creating Fiber invoice..." : stage === "routing" ? "Sending payment on Fiber..." : stage === "settling" ? "Fulfilling Lightning invoice..." : stage === "authenticating" ? "Authorizing..." : "Sending payment..."}</span>
                     {stageDetail && <span className="text-xs opacity-80 font-normal">{stageDetail}</span>}
                   </div>
                 </>
